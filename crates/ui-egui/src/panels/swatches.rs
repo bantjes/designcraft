@@ -298,7 +298,13 @@ fn swatch_row(
     let (c, g) = crate::widgets::swatch_colors(doc, &sw.name, 1.0);
     let chip = egui::Rect::from_min_size(row.min + vec2(4.0 + indent, 3.0), vec2(16.0, 16.0));
     crate::widgets::paint_chip(ui.painter(), chip, c, g);
-    ui.painter().text(row.min + vec2(28.0 + indent, 11.0), egui::Align2::LEFT_CENTER, &sw.name, egui::FontId::proportional(12.5), t.text);
+    ui.painter().text(
+        row.min + vec2(28.0 + indent, 11.0),
+        egui::Align2::LEFT_CENTER,
+        &sw.name,
+        egui::FontId::proportional(12.5),
+        if fill_cur == Some(sw.name.as_str()) { t.on_selected(t.text) } else { t.text },
+    );
     // Type indicators: spot dot / process square, colour mode.
     let kind = swatch_kind_label(&app.ui.language, &sw.value);
     if sw.locked {

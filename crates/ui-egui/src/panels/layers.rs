@@ -296,7 +296,10 @@ fn object_rows(
                 egui::Align2::LEFT_CENTER,
                 &name,
                 egui::FontId::proportional(11.0),
-                if it.hidden { t.text_dim } else { t.text },
+                {
+                    let ink = if it.hidden { t.text_dim } else { t.text };
+                    if is_sel || ls.shown.contains(&it.id) { t.on_selected(ink) } else { ink }
+                },
             );
         }
         let sq = selection_square(ui, ls.language, row, ls.layer_color, is_sel, true, ("item", it.id.0)).clicked();
@@ -407,7 +410,7 @@ pub fn show(app: &mut DesignApp, ui: &mut Ui) {
         }
         let (eye, lock) = eye_lock(ui, &language, row, l.visible, l.locked, false, ("layer", l.id.0));
         let tri = Rect::from_min_size(row.min + vec2(2.0 * COL_W + 2.0, 0.0), vec2(14.0, ROW_H));
-        disclosure(ui, tri, open, t.icon);
+        disclosure(ui, tri, open, if l.id == active { t.on_selected(t.icon) } else { t.icon });
         let tri_r = ui.interact(tri, ui.scope_id().with(("tri", l.id.0)), Sense::click());
         // Layer colour chip and name.
         let chip = Rect::from_min_size(row.min + vec2(2.0 * COL_W + 18.0, 7.0), vec2(4.0, 10.0));
@@ -417,10 +420,15 @@ pub fn show(app: &mut DesignApp, ui: &mut Ui) {
             egui::Align2::LEFT_CENTER,
             &l.name,
             egui::FontId::proportional(11.5),
-            t.text_strong,
+            if l.id == active { t.on_selected(t.text_strong) } else { t.text_strong },
         );
         if l.id == active {
-            icons::paint(ui.painter(), Rect::from_center_size(pos2(row.max.x - 32.0, row.center().y), vec2(13.0, 13.0)), "tool-pen", t.icon);
+            icons::paint(
+                ui.painter(),
+                Rect::from_center_size(pos2(row.max.x - 32.0, row.center().y), vec2(13.0, 13.0)),
+                "tool-pen",
+                t.on_selected(t.icon),
+            );
         }
         let sq = selection_square(ui, &language, row, lc, sel_layers.contains(&l.id), false, ("layer", l.id.0));
         sq.dnd_set_drag_payload(LayersDrag::Selection);

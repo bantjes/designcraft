@@ -98,8 +98,8 @@ pub struct Tokens {
 
 /// Marian Red's frame (the application bar and document tabs) and the darker red above the
 /// panels, from Emma's picture of 28 October 2026.
-const MARIAN_RED1: Color32 = Color32::from_rgb(113, 37, 32);
-const MARIAN_RED2: Color32 = Color32::from_rgb(96, 33, 30);
+const MARIAN_RED1: Color32 = Color32::from_rgb(125, 22, 22);
+const MARIAN_RED2: Color32 = Color32::from_rgb(106, 20, 20);
 
 fn hex(s: u32) -> Color32 {
     Color32::from_rgb((s >> 16) as u8, (s >> 8) as u8, s as u8)
@@ -287,7 +287,7 @@ impl Tokens {
                 icon: hex(0x2e1c1c),
                 hover: hex(0xcdc2c2),
                 tool_active: hex(0x2f9e44),
-                row_selected: hex(0xcf9693),
+                row_selected: hex(0x9c3434),
                 pasteboard: hex(0x5e5e5e),
                 ruler: hex(0x1f1f1f),
                 ruler_tick: hex(0x858585),
@@ -332,8 +332,8 @@ impl Tokens {
     /// tool on green (the Selection arrow then paints black, Direct Selection white).
     pub fn marian_toolbar(self) -> Self {
         Tokens {
-            panel: hex(0x7d2924),
-            divider: hex(0x5a1d1a),
+            panel: MARIAN_RED1,
+            divider: MARIAN_RED2,
             hover: hex(0x9a3a34),
             tool_active: hex(0x2f9e44),
             well: hex(0x2f9e44),
@@ -688,6 +688,21 @@ pub fn visuals(t: &Tokens) -> Visuals {
 }
 
 impl Tokens {
+    /// `normal` ink for a row painted with `row_selected`, or white when `normal` is too dark to
+    /// read on it (Marian Red's selected rows are a deep red under dark panel text).
+    pub fn on_selected(&self, normal: Color32) -> Color32 {
+        fn lum(c: Color32) -> f32 {
+            let f = |v: u8| {
+                let v = f32::from(v) / 255.0;
+                if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+            };
+            0.2126 * f(c.r()) + 0.7152 * f(c.g()) + 0.0722 * f(c.b())
+        }
+        let (a, b) = (lum(normal), lum(self.row_selected));
+        let contrast = (a.max(b) + 0.05) / (a.min(b) + 0.05);
+        if contrast < 3.0 { Color32::WHITE } else { normal }
+    }
+
     /// Tokens stored by [`apply`].
     pub fn get(ctx: &egui::Context) -> Tokens {
         ctx.data(|d| d.get_temp::<Tokens>(egui::Id::NULL)).unwrap_or_else(|| Tokens::for_brightness(Brightness::Dark))

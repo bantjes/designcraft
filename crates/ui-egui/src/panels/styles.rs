@@ -126,7 +126,14 @@ fn style_row(
     let label = if n.contains('/') { shown } else { crate::i18n::style_name(&app.ui.language, shown) };
     let row_label = format!("{label}{}", if current == Some(n) && overridden { "+" } else { "" });
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, current == Some(n), &row_label));
-    crate::rtl::paint(ui.painter(), row.min + vec2(8.0, 11.0), egui::Align2::LEFT_CENTER, &row_label, egui::FontId::proportional(12.5), t.text);
+    crate::rtl::paint(
+        ui.painter(),
+        row.min + vec2(8.0, 11.0),
+        egui::Align2::LEFT_CENTER,
+        &row_label,
+        egui::FontId::proportional(12.5),
+        if current == Some(n) { t.on_selected(t.text) } else { t.text },
+    );
     let editable = n != if para { designcraft_doc::NO_PARA_STYLE } else { designcraft_doc::NO_CHAR_STYLE };
     if resp.double_clicked() && editable {
         crate::dialogs::open_style_options(app, para, n);

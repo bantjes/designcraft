@@ -351,7 +351,7 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
                             egui::Align2::LEFT_CENTER,
                             label,
                             egui::FontId::proportional(11.5),
-                            t.text_strong,
+                            if active { t.on_selected(t.text_strong) } else { t.text_strong },
                         );
                         parent_icon(app, ui, egui::pos2(r.max.x - 10.0, r.center().y), row, icon_h, parent_thumbnails, &t);
                     } else {
