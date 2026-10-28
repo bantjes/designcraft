@@ -64,9 +64,9 @@ pub(crate) const CANVAS: &str = "canvas";
 /// Width of an expanded dock column.
 const COLUMN_WIDTH: f32 = 260.0;
 /// The Pages panel's column at the left: narrow, and it can be dragged narrower still
-/// ([`PAGES_MIN_WIDTH`]).
+/// ([`PAGES_MIN_WIDTH`]: one thumbnail sliver).
 const PAGES_COLUMN_WIDTH: f32 = 120.0;
-const PAGES_MIN_WIDTH: f32 = 56.0;
+const PAGES_MIN_WIDTH: f32 = 24.0;
 /// Width of an iconic column of bare icons, and of one whose groups show their names.
 const ICON_WIDTH: f32 = 37.0;
 const NAMED_ICON_WIDTH: f32 = 150.0;

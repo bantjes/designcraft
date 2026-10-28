@@ -1,4 +1,4 @@
-//! File › Export Page as JPEG or TIFF…: a window with the page, format, colour profile,
+//! File › Export Page as TIFF or JPEG…: a window with the page, format, colour profile,
 //! resolution, size, JPEG quality or TIFF compression, rich black and bleed; Export asks where
 //! to save and writes what `file.exportImage` makes. The choices are kept for next time.
 
@@ -42,7 +42,7 @@ pub struct ExportImageSettings {
 impl Default for ExportImageSettings {
     fn default() -> Self {
         Self {
-            tiff: false,
+            tiff: true,
             adobe_rgb: false,
             ppi: 300.0,
             size_by: SizeBy::Percent,
@@ -142,7 +142,7 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
     let mut open = true;
     let mut export = false;
     let mut cancel = false;
-    egui::Window::new(tr("Export Page as JPEG or TIFF"))
+    egui::Window::new(tr("Export Page as TIFF or JPEG"))
         .id(egui::Id::unique("export-image-window"))
         .open(&mut open)
         .default_pos(ctx.content_rect().center() - egui::vec2(180.0, 200.0))
@@ -163,8 +163,8 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
 
                 ui.label(tr("Format:"));
                 ui.horizontal(|ui| {
-                    ui.radio_value(&mut s.tiff, false, "JPEG");
                     ui.radio_value(&mut s.tiff, true, "TIFF");
+                    ui.radio_value(&mut s.tiff, false, "JPEG");
                 });
                 ui.end_row();
 
@@ -178,7 +178,7 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
                 ui.label(tr("Resolution:"));
                 ui.horizontal(|ui| {
                     ui.add(egui::DragValue::new(&mut s.ppi).range(1.0..=2400.0).speed(1.0).max_decimals(0).suffix(" ppi"));
-                    for preset in [72.0, 150.0, 300.0] {
+                    for preset in [72.0, 300.0, 400.0] {
                         if ui.selectable_label(s.ppi == preset, format!("{preset}")).clicked() {
                             s.ppi = preset;
                         }
@@ -227,7 +227,8 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
                         },
                     );
                 } else {
-                    ui.label(tr("Quality:"));
+                    // JPEG's compression is its quality: lower makes a smaller file.
+                    ui.label(tr("Compression:"));
                     ui.horizontal(|ui| {
                         ui.add(egui::Slider::new(&mut s.quality, 1..=100));
                         ui.label(RichText::new(tr(quality_label(s.quality))).color(t.text_dim));

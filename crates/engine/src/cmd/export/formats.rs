@@ -318,7 +318,7 @@ pub(super) fn export_epub(s: &mut Session, p: &Value) -> Result<Value> {
 const MAX_PPI: f64 = 2400.0;
 const MAX_SCALE_PERCENT: f64 = 1000.0;
 
-/// File › Export Page as JPEG or TIFF: one page rendered at a resolution and size, in sRGB or
+/// File › Export Page as TIFF or JPEG: one page rendered at a resolution and size, in sRGB or
 /// Adobe RGB (1998) with the profile embedded.
 pub(super) fn export_image(s: &mut Session, p: &Value) -> Result<Value> {
     use designcraft_images::export::{ExportOptions, Format, Profile, TiffCompression};

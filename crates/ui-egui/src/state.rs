@@ -201,7 +201,7 @@ pub struct UiState {
     /// The Closet window is open.
     #[serde(skip)]
     pub closet_open: bool,
-    /// File › Export Page as JPEG or TIFF…: the last choices, whether the window is open and
+    /// File › Export Page as TIFF or JPEG…: the last choices, whether the window is open and
     /// the page it exports.
     pub export_image: crate::export_image::ExportImageSettings,
     #[serde(skip)]

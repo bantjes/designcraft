@@ -11,15 +11,12 @@ use crate::{DesignApp, icons};
 const BTN: f32 = 24.0;
 
 pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
-    // Marian Red: the Tools panel (its buttons and proxy too) draws with its own red tokens.
-    let outer = Tokens::get(ui.ctx());
-    let red = app.ui.brightness == crate::theme::Brightness::MarianRed;
-    if red {
-        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, outer.marian_toolbar()));
-    }
-    show_tools(app, ui);
-    if red {
-        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, outer));
+    // Marian Red: the Tools panel (its buttons and proxy too) is the darker red, light icons.
+    if app.ui.brightness == crate::theme::Brightness::MarianRed {
+        let tools = Tokens::get(ui.ctx()).marian_frame().marian_toolbar();
+        crate::theme::scoped(ui, &tools, |ui| show_tools(app, ui));
+    } else {
+        show_tools(app, ui);
     }
 }
 

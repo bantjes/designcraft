@@ -1,4 +1,4 @@
-//! File › Export Page as JPEG or TIFF: size, resolution, profile, compression and rich black.
+//! File › Export Page as TIFF or JPEG: size, resolution, profile, compression and rich black.
 use designcraft_engine::Session;
 use serde_json::json;
 

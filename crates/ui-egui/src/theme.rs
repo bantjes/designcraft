@@ -14,8 +14,8 @@ pub enum Brightness {
     Light,
     /// Accessibility: black chrome, white text, yellow selection and focus.
     HighContrast,
-    /// Marian DesignCraft's: a dark red frame and toolbar, panels and menus in a deep shade of
-    /// the red, white lettering, the current tool on green.
+    /// Marian DesignCraft's: a dark red frame and toolbar, panels and menus in a light dusky
+    /// rose with dark lettering, the current tool on green.
     MarianRed,
 }
 
@@ -264,35 +264,61 @@ impl Tokens {
                 ..dark
             },
             // The page area and rulers stay neutral grey, so colours on the page look true.
+            // Light dusky rose panels and menus with dark lettering; the frame round them is
+            // dark red (`marian_frame`). The page area and rulers stay neutral grey, so colours
+            // on the page look true.
             Brightness::MarianRed => Tokens {
+                dark: false,
                 app_bar: hex(0x7d1616),
-                panel: hex(0x5e2626),
-                panel_darker: hex(0x4c1d1d),
-                input: hex(0x3b1616),
-                input_border: hex(0xa65d5d),
-                divider: hex(0x481a1a),
-                text: hex(0xffffff),
-                text_strong: hex(0xffffff),
-                text_dim: hex(0xe8c6c6),
-                text_disabled: hex(0xa88080),
-                icon: hex(0xf4e8e8),
-                hover: hex(0x7e3838),
+                panel: hex(0xecd5d7),
+                panel_darker: hex(0xe0c3c6),
+                input: hex(0xfaf1f2),
+                input_border: hex(0xa37d81),
+                divider: hex(0xd3b2b6),
+                text: hex(0x2a1416),
+                text_strong: hex(0x000000),
+                text_dim: hex(0x5b3a3e),
+                text_disabled: hex(0x9a7e81),
+                icon: hex(0x3a1c1f),
+                hover: hex(0xe2c1c5),
                 tool_active: hex(0x2f9e44),
-                row_selected: hex(0x9c3434),
+                row_selected: hex(0xd8a3aa),
                 pasteboard: hex(0x5e5e5e),
                 ruler: hex(0x1f1f1f),
                 ruler_tick: hex(0x858585),
-                tab_inactive: hex(0x561e1e),
-                button: hex(0x5e2626),
-                border: hex(0x351010),
-                field_border: hex(0xa65d5d),
-                well: hex(0x351212),
-                well_rim: hex(0x7a3b3b),
+                tab_inactive: hex(0xd6b6ba),
+                button: hex(0xecd5d7),
+                border: hex(0x8f5a60),
+                field_border: hex(0xa37d81),
+                well: hex(0xd3b2b6),
+                well_rim: hex(0xa37d81),
                 ruler_text: hex(0xffffff),
-                section_divider: hex(0x481a1a),
-                tab_strip: hex(0x6a1414),
+                section_divider: hex(0xd3b2b6),
+                tab_strip: hex(0xcfa6ab),
                 ..dark
             },
+        }
+    }
+
+    /// Marian DesignCraft's frame (the application bar): dark red, white lettering.
+    pub fn marian_frame(self) -> Self {
+        Tokens {
+            dark: true,
+            panel: hex(0x7d1616),
+            panel_darker: hex(0x6a1414),
+            input: hex(0x4a1010),
+            input_border: hex(0xa65d5d),
+            field_border: hex(0xa65d5d),
+            divider: hex(0x5e1010),
+            button: hex(0x7d1616),
+            hover: hex(0x9a2a2a),
+            text: hex(0xffffff),
+            text_strong: hex(0xffffff),
+            text_dim: hex(0xf0d0d0),
+            text_disabled: hex(0xb08888),
+            icon: hex(0xfff4f4),
+            row_selected: hex(0x9c3434),
+            ..self
         }
     }
 
@@ -588,6 +614,24 @@ pub fn semibold(size: f32) -> FontId {
 
 pub fn apply(ctx: &egui::Context, t: &Tokens) {
     ctx.data_mut(|d| d.insert_temp(egui::Id::NULL, *t));
+    ctx.set_visuals(visuals(t));
+    style(ctx);
+}
+
+/// Draw `add` with `t`'s colours (its tokens and widget visuals), then go back to the theme's.
+pub fn scoped<R>(ui: &mut egui::Ui, t: &Tokens, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let outer = Tokens::get(ui.ctx());
+    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, *t));
+    // Not `ui.scope`: a panel added in a child ui wouldn't take its room from this one.
+    let saved = ui.visuals().clone();
+    *ui.visuals_mut() = visuals(t);
+    let r = add(ui);
+    *ui.visuals_mut() = saved;
+    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, outer));
+    r
+}
+
+fn style(ctx: &egui::Context) {
     let text_styles: std::collections::BTreeMap<TextStyle, FontId> = [
         (TextStyle::Small, FontId::proportional(10.0)),
         (TextStyle::Body, FontId::proportional(11.0)),
@@ -596,6 +640,18 @@ pub fn apply(ctx: &egui::Context, t: &Tokens) {
         (TextStyle::Monospace, FontId::monospace(11.5)),
     ]
     .into();
+    ctx.global_style_mut(|s| {
+        s.text_styles = text_styles.clone();
+        s.spacing.item_spacing = egui::vec2(6.0, 4.0);
+        s.spacing.button_padding = egui::vec2(6.0, 2.0);
+        s.spacing.interact_size = egui::vec2(20.0, 21.0);
+        s.spacing.menu_margin = egui::Margin::same(4);
+        s.animation_time = 0.06;
+    });
+}
+
+/// The egui visuals of `t`.
+pub fn visuals(t: &Tokens) -> Visuals {
     let mut v = if t.dark { Visuals::dark() } else { Visuals::light() };
     let r = CornerRadius::same(t.radius);
     v.panel_fill = t.panel;
@@ -622,15 +678,7 @@ pub fn apply(ctx: &egui::Context, t: &Tokens) {
     v.widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
     v.widgets.inactive.bg_fill = t.input;
     v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 12, spread: 0, color: Color32::from_black_alpha(90) };
-    ctx.set_visuals(v);
-    ctx.global_style_mut(|s| {
-        s.text_styles = text_styles.clone();
-        s.spacing.item_spacing = egui::vec2(6.0, 4.0);
-        s.spacing.button_padding = egui::vec2(6.0, 2.0);
-        s.spacing.interact_size = egui::vec2(20.0, 21.0);
-        s.spacing.menu_margin = egui::Margin::same(4);
-        s.animation_time = 0.06;
-    });
+    v
 }
 
 impl Tokens {

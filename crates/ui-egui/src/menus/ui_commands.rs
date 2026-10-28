@@ -40,7 +40,7 @@ pub const UI_COMMANDS: &[(&str, &str, Option<&str>, &str)] = &[
     ("app.exportPng", "Export Page as PNG…", Some("Cmd+E"), "{}"),
     (
         "app.exportImage",
-        "Export Page as JPEG or TIFF…",
+        "Export Page as TIFF or JPEG…",
         None,
         "{show?} — the window: page, format, colour profile (sRGB, Adobe RGB (1998)), resolution, size, quality or compression, rich black (runs file.exportImage)",
     ),

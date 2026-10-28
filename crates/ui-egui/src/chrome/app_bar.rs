@@ -154,6 +154,16 @@ fn tools_slot_width(available: f32, tools_w: f32) -> f32 {
 
 /// Lay out the application bar, native/custom title handling, menu and tool scrolling, drag region, caption controls and search.
 pub fn app_bar(app: &mut DesignApp, ui: &mut egui::Ui) {
+    // Marian Red: the bar is the dark red frame, with white lettering.
+    if app.ui.brightness == crate::theme::Brightness::MarianRed {
+        let frame = Tokens::get(ui.ctx()).marian_frame();
+        crate::theme::scoped(ui, &frame, |ui| bar(app, ui));
+    } else {
+        bar(app, ui);
+    }
+}
+
+fn bar(app: &mut DesignApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let mac = app.integrated_titlebar;
     let left = if mac { MAC_CONTENT_LEFT as i8 } else { 8 };

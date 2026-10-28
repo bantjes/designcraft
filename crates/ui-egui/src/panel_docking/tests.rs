@@ -1296,3 +1296,28 @@ fn a_document_dropped_on_a_floating_panel_window_opens() {
     open_window_drops(&mut app, &[files]);
     assert_eq!(app.session.documents().len(), 1, "the dropped document opens");
 }
+
+/// Marian DesignCraft: the Pages column at the left drags down to a sliver.
+#[test]
+fn the_pages_column_drags_very_narrow() {
+    crate::closet::use_starting_sort();
+    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_ui_state(
+        |ui, app: &mut DesignApp| {
+            app.logic(ui.ctx());
+            app.ui(ui);
+        },
+        app(),
+    );
+    h.run_steps(5);
+    let column = craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Column("pages".to_string()));
+    let divider = |h: &Harness<'static, DesignApp>| {
+        hits(h).into_iter().find_map(|(hit, rect)| (hit == column).then_some(rect)).expect("the Pages column's divider")
+    };
+    let tab = |h: &Harness<'static, DesignApp>| h.ctx.read_response(tab_id("pages")).map(|r| r.rect).unwrap();
+    let (before, start) = (divider(&h), tab(&h));
+    drag(&mut h, before.center(), egui::pos2(0.0, before.center().y));
+    h.run_steps(3);
+    let after = divider(&h);
+    let narrow = after.center().x - start.min.x;
+    assert!(narrow <= 40.0, "the Pages column stops {narrow} pt wide (divider {before:?} → {after:?})");
+}
