@@ -9,6 +9,16 @@ const DOC_TAB_PAD: f32 = 44.0;
 
 /// Draw bounded document tabs with active, dirty, preview and zoom state, plus activation and close actions.
 pub fn doc_tabs(app: &mut DesignApp, ui: &mut egui::Ui) {
+    // Marian Red: the document tabs are the frame's red, on the darker red.
+    if app.ui.brightness == crate::theme::Brightness::MarianRed {
+        let frame = Tokens::get(ui.ctx()).marian_frame();
+        crate::theme::scoped(ui, &frame, |ui| tabs(app, ui));
+    } else {
+        tabs(app, ui);
+    }
+}
+
+fn tabs(app: &mut DesignApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::hover());
     let max_w = DOC_TAB_MAX_W.min(bar.width());

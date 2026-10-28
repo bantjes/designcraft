@@ -96,6 +96,11 @@ pub struct Tokens {
     pub caption_close_text: Color32,
 }
 
+/// Marian Red's frame (the application bar and document tabs) and the darker red above the
+/// panels, from Emma's picture of 28 October 2026.
+const MARIAN_RED1: Color32 = Color32::from_rgb(113, 37, 32);
+const MARIAN_RED2: Color32 = Color32::from_rgb(96, 33, 30);
+
 fn hex(s: u32) -> Color32 {
     Color32::from_rgb((s >> 16) as u8, (s >> 8) as u8, s as u8)
 }
@@ -264,37 +269,37 @@ impl Tokens {
                 ..dark
             },
             // The page area and rulers stay neutral grey, so colours on the page look true.
-            // Light dusky rose panels and menus with dark lettering; the frame round them is
-            // dark red (`marian_frame`). The page area and rulers stay neutral grey, so colours
-            // on the page look true.
+            // Emma's: dusky rose-grey panels and menus (191, 181, 181) with dark lettering, the
+            // darker red (red 2) above them, the frame round them red 1 (`marian_frame`). The page
+            // area and rulers stay neutral grey, so colours on the page look true.
             Brightness::MarianRed => Tokens {
                 dark: false,
-                app_bar: hex(0x7d1616),
-                panel: hex(0xecd5d7),
-                panel_darker: hex(0xe0c3c6),
-                input: hex(0xfaf1f2),
-                input_border: hex(0xa37d81),
-                divider: hex(0xd3b2b6),
-                text: hex(0x2a1416),
+                app_bar: MARIAN_RED1,
+                panel: hex(0xbfb5b5),
+                panel_darker: hex(0xb2a6a6),
+                input: hex(0xdcd4d4),
+                input_border: hex(0x8a7676),
+                divider: hex(0xa69999),
+                text: hex(0x1f1414),
                 text_strong: hex(0x000000),
-                text_dim: hex(0x5b3a3e),
-                text_disabled: hex(0x9a7e81),
-                icon: hex(0x3a1c1f),
-                hover: hex(0xe2c1c5),
+                text_dim: hex(0x473535),
+                text_disabled: hex(0x857474),
+                icon: hex(0x2e1c1c),
+                hover: hex(0xcdc2c2),
                 tool_active: hex(0x2f9e44),
-                row_selected: hex(0xd8a3aa),
+                row_selected: hex(0xcf9693),
                 pasteboard: hex(0x5e5e5e),
                 ruler: hex(0x1f1f1f),
                 ruler_tick: hex(0x858585),
-                tab_inactive: hex(0xd6b6ba),
-                button: hex(0xecd5d7),
-                border: hex(0x8f5a60),
-                field_border: hex(0xa37d81),
-                well: hex(0xd3b2b6),
-                well_rim: hex(0xa37d81),
+                tab_inactive: MARIAN_RED2,
+                button: hex(0xbfb5b5),
+                border: hex(0x5a2a28),
+                field_border: hex(0x8a7676),
+                well: hex(0xa69999),
+                well_rim: hex(0x8a7676),
                 ruler_text: hex(0xffffff),
-                section_divider: hex(0xd3b2b6),
-                tab_strip: hex(0xcfa6ab),
+                section_divider: hex(0xa69999),
+                tab_strip: MARIAN_RED2,
                 ..dark
             },
         }
@@ -304,14 +309,15 @@ impl Tokens {
     pub fn marian_frame(self) -> Self {
         Tokens {
             dark: true,
-            panel: hex(0x7d1616),
-            panel_darker: hex(0x6a1414),
+            panel: MARIAN_RED1,
+            panel_darker: MARIAN_RED2,
+            tab_strip: MARIAN_RED2,
             input: hex(0x4a1010),
             input_border: hex(0xa65d5d),
             field_border: hex(0xa65d5d),
             divider: hex(0x5e1010),
-            button: hex(0x7d1616),
-            hover: hex(0x9a2a2a),
+            button: MARIAN_RED1,
+            hover: hex(0x8e3d3a),
             text: hex(0xffffff),
             text_strong: hex(0xffffff),
             text_dim: hex(0xf0d0d0),
@@ -326,9 +332,9 @@ impl Tokens {
     /// tool on green (the Selection arrow then paints black, Direct Selection white).
     pub fn marian_toolbar(self) -> Self {
         Tokens {
-            panel: hex(0x8b1a1a),
-            divider: hex(0x5e1010),
-            hover: hex(0xa83232),
+            panel: hex(0x7d2924),
+            divider: hex(0x5a1d1a),
+            hover: hex(0x9a3a34),
             tool_active: hex(0x2f9e44),
             well: hex(0x2f9e44),
             well_rim: hex(0x1d6b2c),

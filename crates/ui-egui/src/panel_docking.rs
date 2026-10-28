@@ -1157,6 +1157,9 @@ pub(crate) fn inspect(app: &DesignApp, ctx: &egui::Context) -> Value {
     })
 }
 
+/// Tab lettering on a dark tab strip above light panels (Marian Red's darker red).
+const STRIP_TEXT: egui::Color32 = egui::Color32::from_rgb(0xf0, 0xdc, 0xdc);
+
 fn dock_style(ui: &egui::Ui, language: &str) -> craft_ui::docking::DockStyle {
     let t = crate::theme::Tokens::get(ui.ctx());
     let mut style = craft_ui::docking::DockStyle::from_ui(ui);
@@ -1165,7 +1168,12 @@ fn dock_style(ui: &egui::Ui, language: &str) -> craft_ui::docking::DockStyle {
     style.tab_background = t.tab_strip;
     style.active_background = t.panel;
     style.text = t.text_strong;
-    style.inactive_text = t.text_dim;
+    // Light lettering on a dark tab strip under light panels (Marian Red's darker red).
+    let dark_strip = {
+        let [r, g, b, _] = t.tab_strip.to_array();
+        u32::from(r) * 3 + u32::from(g) * 6 + u32::from(b) < 900
+    };
+    style.inactive_text = if dark_strip && !t.dark { STRIP_TEXT } else { t.text_dim };
     style.border = egui::Stroke::new(1.0, t.border);
     style.accent = t.accent;
     style.blocked_dim = t.panel.gamma_multiply(0.6);
@@ -1341,6 +1349,8 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
     }
     fn paint_icon(&mut self, painter: &egui::Painter, rect: egui::Rect, id: &String, color: egui::Color32) -> bool {
         let Some(icon) = panel_icon(id) else { return false };
+        // The iconic column sits on the light panel colour, not on the dark strip.
+        let color = if color == STRIP_TEXT { crate::theme::Tokens::get(painter.ctx()).icon } else { color };
         crate::icons::paint(painter, rect, icon, color);
         true
     }
