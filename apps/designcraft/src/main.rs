@@ -1,10 +1,8 @@
 //! DesignCraft desktop app.
 //!
-//! Usage: `designcraft [--control <port>] [--sample] [files…]`
+//! Usage: `designcraft [--sample] [files…]`
 //!
-//! `--control <port>` (or `DESIGNCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control server:
-//! `{"id":1,"method":"ui.inspect","params":{}}` → `{"id":1,"ok":true,"result":…}`.
-//! See `designcraft_ui_egui::control` for the methods.
+//! Marian DesignCraft has no control server: nothing outside the app can drive it.
 //!
 //! The graphics backend (DirectX 12, Vulkan, Metal or OpenGL) and the adapter that draws the
 //! window are chosen in `gpu`, with a fallback for a driver or adapter that fails at start-up;
@@ -15,7 +13,6 @@
 
 #[cfg(target_os = "macos")]
 mod apple_events;
-mod control_server;
 mod gpu;
 mod gpu_limits;
 mod logging;
@@ -378,46 +375,29 @@ fn services() -> Services {
 const APP_ID: &str = "ai.storyteller.designcraft";
 
 /// The window, Dock, taskbar and Alt-Tab icon. macOS gets Apple's icon grid (transparent margin);
-/// elsewhere the full tile. Regenerate with `packaging/icons.sh`.
+/// elsewhere the full tile. Marian DesignCraft's ¶: regenerate with `packaging/marian/icon.py`.
 fn app_icon() -> Option<egui::IconData> {
     #[cfg(target_os = "macos")]
-    let png: &[u8] = include_bytes!("../../../assets/app-icon/designcraft-macos-512.png");
+    let png: &[u8] = include_bytes!("../../../assets/app-icon/marian-designcraft-macos-512.png");
     #[cfg(not(target_os = "macos"))]
-    let png: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.designcraft.png");
+    let png: &[u8] = include_bytes!("../../../assets/app-icon/marian-designcraft-256.png");
     eframe::icon_data::from_png_bytes(png).map_err(|e| log::warn!("app icon: {e}")).ok()
 }
 
-/// The control port from `--control <port>` or `DESIGNCRAFT_CONTROL_PORT` (`source`); a value that
-/// is not a port is logged and ignored instead of silently starting no control channel.
-fn control_port_from(source: &str, value: Option<String>) -> Option<u16> {
-    let value = value?;
-    let port = value.trim().parse().ok();
-    if port.is_none() {
-        log::warn!("{source}: {value:?} is not a port number; the control channel is off");
-    }
-    port
-}
-
 fn main() -> std::process::ExitCode {
-    // Windows: the update helper is a copy of this program started with `--finish-update`.
-    #[cfg(windows)]
-    if let Some(result) = craft_update::self_update::finish(&craft_update::suite::DESIGNCRAFT, &std::env::args_os().skip(1).collect::<Vec<_>>()) {
-        std::process::exit(i32::from(result.is_err()));
-    }
     // First, so every start-up record (and the engine's panic hook, installed with the first
     // Session) is captured; see `logging`.
     let logger = logging::install();
-    let mut control_port = control_port_from("DESIGNCRAFT_CONTROL_PORT", std::env::var("DESIGNCRAFT_CONTROL_PORT").ok());
+    // Before anything reads the settings: the first start brings the original DesignCraft's along.
+    profile::adopt_original();
     let mut files = Vec::new();
     let mut sample = false;
     let mut skip = Vec::new();
-    let mut args = std::env::args().skip(1);
-    while let Some(a) = args.next() {
+    for a in std::env::args().skip(1) {
         match a.as_str() {
-            "--control" => control_port = control_port_from("--control", args.next()),
             "--sample" => sample = true,
             "--version" => {
-                println!("designcraft {}", env!("CARGO_PKG_VERSION"));
+                println!("marian-designcraft {}", env!("CARGO_PKG_VERSION"));
                 return std::process::ExitCode::SUCCESS;
             }
             _ => match gpu::skip_arg(&a) {
@@ -436,14 +416,14 @@ fn main() -> std::process::ExitCode {
     // leaves no file behind. Records logged until now are written to it first.
     if let (Some(logger), Some(dir)) = (logger, profile::config_dir()) {
         match logger.attach_dir(&dir.join("logs")) {
-            Ok(path) => log::info!("DesignCraft {}, log file {}", env!("CARGO_PKG_VERSION"), path.display()),
+            Ok(path) => log::info!("Marian DesignCraft {}, log file {}", env!("CARGO_PKG_VERSION"), path.display()),
             // Standard error only by now (`attach_dir` gave up on the file); unlike `eprintln!`, never panics.
             Err(e) => log::warn!("no log file: {e}"),
         }
     }
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DesignCraft")
+            .with_title(designcraft_ui_egui::APP_NAME)
             .with_inner_size([1440.0, 900.0])
             .with_min_inner_size([900.0, 560.0])
             .with_decorations(!cfg!(target_os = "windows"))
@@ -524,7 +504,7 @@ fn main() -> std::process::ExitCode {
     // A panic that ends the window (egui-wgpu's own) is caught here: never a crash.
     let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         eframe::run_native(
-            "DesignCraft",
+            designcraft_ui_egui::APP_NAME,
             options,
             Box::new(move |cc| {
                 let mut restarted = None;
@@ -559,7 +539,6 @@ fn main() -> std::process::ExitCode {
                 session.recovery_dir = profile::recovery_dir();
                 let recovered = session.execute("file.recovery.open", &serde_json::json!({})).ok();
                 let mut app = DesignApp::new(session, services());
-                app.set_startup_update_check(true);
                 if let Some(line) = restarted.or_else(|| created.status_line()) {
                     app.status(line);
                 }
@@ -574,10 +553,6 @@ fn main() -> std::process::ExitCode {
                 }
                 app.integrated_titlebar = cfg!(target_os = "macos");
                 app.custom_titlebar = cfg!(target_os = "windows");
-                if let Some(port) = control_port {
-                    let rx = control_server::start(port, cc.egui_ctx.clone());
-                    app = app.with_control(rx);
-                }
                 if sample {
                     let _ = app.run("file.newSample", serde_json::json!({}));
                 }
@@ -644,16 +619,6 @@ mod tests {
             assert!(exts.contains(&ext), "{ext} is missing from the relink dialog: {exts:?}");
         }
         assert!(!exts.contains(&"designcraft") && !exts.contains(&"idml"));
-    }
-
-    #[test]
-    fn control_port_values_that_are_not_ports_are_ignored() {
-        assert_eq!(super::control_port_from("--control", Some("7979".into())), Some(7979));
-        assert_eq!(super::control_port_from("--control", Some(" 7979 ".into())), Some(7979));
-        assert_eq!(super::control_port_from("--control", None), None);
-        for bad in ["", "abc", "-1", "65536", "99999999999999999999"] {
-            assert_eq!(super::control_port_from("--control", Some(bad.into())), None, "{bad:?}");
-        }
     }
 
     #[test]

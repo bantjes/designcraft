@@ -10,6 +10,7 @@ pub use resvg::usvg;
 
 pub mod colour;
 mod eps;
+pub mod export;
 mod jpeg;
 mod psd;
 mod tone;

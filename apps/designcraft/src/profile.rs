@@ -18,12 +18,93 @@ fn config_dir_with(os: &str, env: impl Fn(&str) -> Option<OsString>, exe_dir: Op
         return (!root.is_empty()).then(|| PathBuf::from(root));
     }
     match os {
-        "macos" => env("HOME").map(|p| PathBuf::from(p).join("Library/Application Support/DesignCraft")),
-        "windows" => env("APPDATA").map(|p| PathBuf::from(p).join("DesignCraft")),
+        "macos" => env("HOME").map(|p| PathBuf::from(p).join("Library/Application Support").join(OWN_NAMES[0])),
+        "windows" => env("APPDATA").map(|p| PathBuf::from(p).join(OWN_NAMES[0])),
         _ => {
-            env("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| env("HOME").map(|p| PathBuf::from(p).join(".config"))).map(|p| p.join("designcraft"))
+            env("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| env("HOME").map(|p| PathBuf::from(p).join(".config"))).map(|p| p.join(OWN_NAMES[1]))
         }
     }
+}
+
+/// Marian DesignCraft's own settings folder names: (macOS and Windows, Linux). The original
+/// DesignCraft's are [`ORIGINAL_NAMES`]; the two never share settings.
+const OWN_NAMES: [&str; 2] = ["Marian DesignCraft", "marian-designcraft"];
+const ORIGINAL_NAMES: [&str; 2] = ["DesignCraft", "designcraft"];
+
+/// What the first start leaves behind when it copies the original DesignCraft's settings: its
+/// log files and its recovered documents stay with it.
+const NOT_ADOPTED: [&str; 3] = ["logs", "Recovery", "recovery"];
+
+/// On the first start (no settings folder of its own yet), copy the original DesignCraft's
+/// settings, so the menus hidden and the panels arranged there come along. Nothing happens with
+/// `DESIGNCRAFT_CONFIG_DIR` or a portable install, or when the folder already exists.
+pub fn adopt_original() {
+    let env = |key: &str| std::env::var_os(key);
+    if root_with(env, executable_dir().as_deref()).is_some() {
+        return;
+    }
+    let (Some(own), Some(original)) = (config_dir(), original_dir(std::env::consts::OS, env)) else { return };
+    if let Err(e) = adopt(&original, &own) {
+        log::warn!("could not copy the DesignCraft settings from {}: {e}", original.display());
+    }
+}
+
+/// The original DesignCraft's settings folder.
+fn original_dir(os: &str, env: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
+    match os {
+        "macos" => env("HOME").map(|p| PathBuf::from(p).join("Library/Application Support").join(ORIGINAL_NAMES[0])),
+        "windows" => env("APPDATA").map(|p| PathBuf::from(p).join(ORIGINAL_NAMES[0])),
+        _ => env("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| env("HOME").map(|p| PathBuf::from(p).join(".config")))
+            .map(|p| p.join(ORIGINAL_NAMES[1])),
+    }
+}
+
+/// Copy `from` into the new folder `to`, unless `to` exists or `from` doesn't.
+fn adopt(from: &Path, to: &Path) -> std::io::Result<()> {
+    if to.exists() || !from.is_dir() {
+        return Ok(());
+    }
+    copy_dir(from, to, 0)?;
+    marian_defaults(&to.join("ui.json"));
+    Ok(())
+}
+
+/// Marian DesignCraft starts in Marian Red with frame edges hidden, also when it takes over the
+/// original's settings (a file it can't read is left as it is: the app then starts from its own
+/// defaults, which are the same).
+fn marian_defaults(ui_json: &Path) {
+    let Ok(text) = std::fs::read_to_string(ui_json) else { return };
+    let Ok(serde_json::Value::Object(mut ui)) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+    ui.insert("frameEdges".into(), serde_json::Value::Bool(false));
+    ui.insert("brightness".into(), serde_json::Value::String("MarianRed".into()));
+    if let Ok(out) = serde_json::to_string(&ui) {
+        // Best effort: a failed write leaves the copied file, which still opens.
+        let _ = std::fs::write(ui_json, out);
+    }
+}
+
+fn copy_dir(from: &Path, to: &Path, depth: usize) -> std::io::Result<()> {
+    // Settings folders are shallow; a deeper one is a link loop or not a settings folder.
+    if depth > 8 {
+        return Ok(());
+    }
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if depth == 0 && NOT_ADOPTED.iter().any(|n| name == *n) {
+            continue;
+        }
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_dir(&entry.path(), &to.join(&name), depth + 1)?;
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), to.join(&name))?;
+        }
+    }
+    Ok(())
 }
 
 /// The folder that holds settings and recovery data instead of the user's profile:
@@ -122,6 +203,39 @@ mod tests {
     }
 
     #[test]
+    fn marian_designcraft_keeps_its_own_settings_folder() {
+        assert_eq!(config_dir_with("macos", environment, None), Some("/user/Library/Application Support/Marian DesignCraft".into()));
+        assert_eq!(config_dir_with("windows", environment, None), Some("/roaming/Marian DesignCraft".into()));
+        assert_eq!(config_dir_with("linux", environment, None), Some("/xdg-config/marian-designcraft".into()));
+        assert_eq!(original_dir("macos", environment), Some("/user/Library/Application Support/DesignCraft".into()));
+    }
+
+    #[test]
+    fn the_first_start_copies_the_original_settings_but_not_its_logs_or_recovery() {
+        let root = std::env::temp_dir().join(format!("designcraft-adopt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (from, to) = (root.join("DesignCraft"), root.join("Marian DesignCraft"));
+        std::fs::create_dir_all(from.join("logs")).unwrap();
+        std::fs::create_dir_all(from.join("Recovery")).unwrap();
+        std::fs::create_dir_all(from.join("workspaces")).unwrap();
+        std::fs::write(from.join("ui.json"), "{\"hiddenMenuItems\":[\"File/Revert\"]}").unwrap();
+        std::fs::write(from.join("workspaces/mine.json"), "{}").unwrap();
+        std::fs::write(from.join("logs/designcraft.log"), "log").unwrap();
+        adopt(&from, &to).unwrap();
+        assert!(to.join("ui.json").is_file() && to.join("workspaces/mine.json").is_file());
+        let ui: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(to.join("ui.json")).unwrap()).unwrap();
+        assert_eq!(ui["frameEdges"], false);
+        assert_eq!(ui["brightness"], "MarianRed");
+        assert_eq!(ui["hiddenMenuItems"][0], "File/Revert");
+        assert!(!to.join("logs").exists() && !to.join("Recovery").exists());
+        // Once it has its own folder, the original is never copied again.
+        std::fs::write(to.join("ui.json"), "{}").unwrap();
+        adopt(&from, &to).unwrap();
+        assert_eq!(std::fs::read_to_string(to.join("ui.json")).unwrap(), "{}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn isolated_profile_overrides_every_platform_and_recovery() {
         for os in ["macos", "windows", "linux"] {
             let dir = config_dir_with(os, |key| if key == "DESIGNCRAFT_CONFIG_DIR" { Some("/isolated".into()) } else { environment(key) }, None);
@@ -170,7 +284,7 @@ mod tests {
         // a marker dropped inside the bundle is not looked at
         std::fs::remove_file(folder.join(PORTABLE_MARKER)).unwrap();
         std::fs::write(exe.join(PORTABLE_MARKER), "").unwrap();
-        assert_eq!(config_dir_with("macos", environment, Some(&exe)), Some("/user/Library/Application Support/DesignCraft".into()));
+        assert_eq!(config_dir_with("macos", environment, Some(&exe)), Some("/user/Library/Application Support/Marian DesignCraft".into()));
         let _ = std::fs::remove_dir_all(&folder);
     }
 
@@ -179,7 +293,7 @@ mod tests {
         let plain = install("plain", |_| {});
         let folder = install("marker-folder", |marker| std::fs::create_dir(marker).unwrap());
         for exe in [&plain, &folder] {
-            assert_eq!(config_dir_with("windows", environment, Some(exe)), Some("/roaming/DesignCraft".into()));
+            assert_eq!(config_dir_with("windows", environment, Some(exe)), Some("/roaming/Marian DesignCraft".into()));
             assert_eq!(recovery_dir_with(root_with(environment, Some(exe)), || Some("/existing/recovery".into())), Some("/existing/recovery".into()));
         }
         let _ = std::fs::remove_dir_all(&plain);
@@ -202,7 +316,7 @@ mod tests {
             let _ = std::fs::remove_dir_all(&exe);
             return;
         }
-        assert_eq!(config_dir_with("windows", environment, Some(&exe)), Some("/roaming/DesignCraft".into()));
+        assert_eq!(config_dir_with("windows", environment, Some(&exe)), Some("/roaming/Marian DesignCraft".into()));
         assert_eq!(recovery_dir_with(root_with(environment, Some(&exe)), || Some("/user/recovery".into())), Some("/user/recovery".into()));
         assert_eq!(unwritable_portable_dir_with(environment, Some(&exe)), Some(exe.join("DesignCraftData")));
         set_mode(&exe, 0o755);
@@ -210,7 +324,7 @@ mod tests {
         let data = exe.join(PORTABLE_DATA_DIR);
         std::fs::create_dir(&data).unwrap();
         set_mode(&data, 0o555);
-        assert_eq!(config_dir_with("windows", environment, Some(&exe)), Some("/roaming/DesignCraft".into()));
+        assert_eq!(config_dir_with("windows", environment, Some(&exe)), Some("/roaming/Marian DesignCraft".into()));
         assert_eq!(unwritable_portable_dir_with(environment, Some(&exe)), Some(data.clone()));
         // the override still wins, so there is nothing to warn about
         assert_eq!(
@@ -237,12 +351,12 @@ mod tests {
 
     #[test]
     fn unset_override_preserves_existing_platform_paths() {
-        assert_eq!(config_dir_with("macos", environment, None), Some("/user/Library/Application Support/DesignCraft".into()));
-        assert_eq!(config_dir_with("windows", environment, None), Some("/roaming/DesignCraft".into()));
-        assert_eq!(config_dir_with("linux", environment, None), Some("/xdg-config/designcraft".into()));
+        assert_eq!(config_dir_with("macos", environment, None), Some("/user/Library/Application Support/Marian DesignCraft".into()));
+        assert_eq!(config_dir_with("windows", environment, None), Some("/roaming/Marian DesignCraft".into()));
+        assert_eq!(config_dir_with("linux", environment, None), Some("/xdg-config/marian-designcraft".into()));
         assert_eq!(
             config_dir_with("linux", |key| if key == "HOME" { environment(key) } else { None }, None),
-            Some("/user/.config/designcraft".into())
+            Some("/user/.config/marian-designcraft".into())
         );
         assert_eq!(recovery_dir_with(None, || Some("/existing/recovery".into())), Some("/existing/recovery".into()));
     }

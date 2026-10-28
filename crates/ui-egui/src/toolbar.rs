@@ -1,7 +1,7 @@
 //! The Tools panel (left): single or double column, tool groups with flyouts, fill/stroke proxy,
 //! screen mode buttons.
 
-use designcraft_tools::{SPLIT_IN_TWO_COLUMNS, TOOL_GROUPS};
+use designcraft_tools::{SPLIT_IN_TWO_COLUMNS, TOOL_GROUPS, ToolInfo};
 use egui::{Color32, Sense, Stroke, StrokeKind, vec2};
 use serde_json::{Value, json};
 
@@ -11,6 +11,19 @@ use crate::{DesignApp, icons};
 const BTN: f32 = 24.0;
 
 pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
+    // Marian Red: the Tools panel (its buttons and proxy too) draws with its own red tokens.
+    let outer = Tokens::get(ui.ctx());
+    let red = app.ui.brightness == crate::theme::Brightness::MarianRed;
+    if red {
+        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, outer.marian_toolbar()));
+    }
+    show_tools(app, ui);
+    if red {
+        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::NULL, outer));
+    }
+}
+
+fn show_tools(app: &mut DesignApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let frame = egui::Frame::NONE.fill(t.panel).stroke(Stroke::new(1.0, t.divider));
     // A single column that doesn't fit the window's height becomes two, without changing the
@@ -49,7 +62,8 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
             // A slot is a group (its current tool shown, the others in its flyout) or, in two
             // columns, one tool of a group InDesign lays out tool by tool.
             let mut row_items: Vec<Option<(usize, Option<usize>)>> = Vec::new();
-            for (gi, g) in TOOL_GROUPS.iter().enumerate() {
+            let groups = shown_groups(app);
+            for (gi, g) in groups.iter().enumerate() {
                 if g.is_empty() {
                     row_items.push(None);
                 } else if cols == 2 && SPLIT_IN_TWO_COLUMNS.contains(&g[0].id) {
@@ -74,9 +88,14 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
                         ui.horizontal(|ui| {
                             ui.add_space(8.0);
                             ui.spacing_mut().item_spacing.x = 4.0;
-                            for _ in 0..cols {
+                            for col in 0..cols {
                                 let Some(Some((gi, pinned))) = row_items.get(i).copied() else { break };
-                                let group = TOOL_GROUPS[gi];
+                                // A group laid out tool by tool starts a row of its own (with the
+                                // two arrows sharing one button, the tools before it can be odd).
+                                if col > 0 && pinned == Some(0) {
+                                    break;
+                                }
+                                let Some(group) = groups.get(gi).map(Vec::as_slice) else { break };
                                 let g = match pinned {
                                     Some(k) => &group[k..=k],
                                     None => group,
@@ -217,6 +236,28 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
     if std::env::var_os("DESIGNCRAFT_DEBUG_LAYOUT").is_some() {
         eprintln!("tools panel rect {:?} (wanted width {width}); remaining {:?}", r.response.rect, ui.available_rect_before_wrap());
     }
+}
+
+/// The Tools panel's groups without the tools put away in the Closet: a group left empty goes,
+/// and so does a separator (an empty group) left first, last or next to another.
+pub(crate) fn shown_groups(app: &DesignApp) -> Vec<Vec<ToolInfo>> {
+    let mut out: Vec<Vec<ToolInfo>> = Vec::new();
+    for g in TOOL_GROUPS {
+        if g.is_empty() {
+            if out.last().is_some_and(|l| !l.is_empty()) {
+                out.push(Vec::new());
+            }
+            continue;
+        }
+        let kept: Vec<ToolInfo> = g.iter().filter(|t| !crate::closet::tool_hidden(&app.ui, t.id)).copied().collect();
+        if !kept.is_empty() {
+            out.push(kept);
+        }
+    }
+    if out.last().is_some_and(Vec::is_empty) {
+        out.pop();
+    }
+    out
 }
 
 /// Row 1 of the proxy: the default-colours and swap buttons.

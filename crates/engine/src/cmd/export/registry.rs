@@ -1,4 +1,4 @@
-use super::formats::{epub_split_param, export_epub, export_html, export_pptx, export_text, has_story_target, print_booklet};
+use super::formats::{epub_split_param, export_epub, export_html, export_image, export_pptx, export_text, has_story_target, print_booklet};
 use super::pdf::export_pdf;
 use super::{CommandSpec, Value, cmd, has_doc, json};
 
@@ -46,6 +46,9 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!(noundo "file.exportPptx", "Export PowerPoint…", ["File"], None,
         "{path?, pages?: \"1-3,5\" | [1,3] (1-based positions; default all), lineBreaks?: keep|reflow (keep: DesignCraft's lines, spacing and leading; reflow: one box per frame, PowerPoint sets the lines), rasterize?: bool (default true: objects PowerPoint can't show — placed PDF/EPS, type on a path, some effects — go in as 300 ppi images), embedFonts?: bool (default true: the TrueType fonts whose licences allow it), title?, author?} — every page as a slide of editable shapes, pictures, text boxes and tables → {path, bytes, slides, warnings} (no path: {base64, …})",
         has_doc, export_pptx),
+        cmd!(noundo "file.exportImage", "Export Page as JPEG or TIFF…", ["File"], None,
+        "{path?, page?: index (0-based; default 0), format?: jpeg|tiff (default jpeg), profile?: sRGB|adobeRGB (Adobe RGB (1998); the pixels are converted and the profile embedded; default sRGB), ppi?: 1-2400 (default 300), scale?: 1-1000 (percent of the page's size; default 100), width?: pixels (overrides scale; the height follows), quality?: 1-100 (JPEG; default 90), compression?: none|lzw|zip (TIFF, lossless; default lzw), richBlack?: bool (100% black as rich black; default Preferences › Appearance of Black), bleed?: bool} → {path, width, height, ppi, bytes} (no path: {base64, …})",
+        has_doc, export_image),
         cmd!(noundo "file.exportText", "Export Text…", ["File"], None,
         "{path?, format?: \"txt\"|\"rtf\"|\"tagged\" (Tagged Text; default from the path, else txt), story?, frame?} — the story being edited or of the selected frame → {path, bytes} (no path: {text, bytes})",
         has_story_target, export_text),

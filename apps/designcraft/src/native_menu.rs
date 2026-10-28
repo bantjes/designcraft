@@ -24,8 +24,8 @@ pub struct NativeMenu {
     last_refresh: f64,
     /// The interface language the titles are in, whether CJK features are shown and whether the
     /// Keyboard Shortcuts dialog records keys (the menu then has no key equivalents, so the keys
-    /// reach the dialog): the menu is rebuilt when any of them changes.
-    shown_for: (String, bool, bool),
+    /// reach the dialog), and what the Closet holds: the menu is rebuilt when any of them changes.
+    shown_for: (String, bool, bool, std::collections::BTreeMap<String, String>),
     /// File › Open Recent, rebuilt when the list of recent files changes.
     recent: Option<RecentMenu>,
     /// The commands with key equivalents and the shortcut each was given: the menu is rebuilt
@@ -83,7 +83,7 @@ impl NativeMenu {
         let mut recent = None;
         // Application menu: our own About splash (with the community links) instead of the stock
         // panel, and Settings… (Edit › Preferences… on the other platforms).
-        let app_menu = Submenu::new("DesignCraft", true);
+        let app_menu = Submenu::new(designcraft_ui_egui::APP_NAME, true);
         for entry in menus::MAC_APP_MENU {
             let _ = match *entry {
                 AppMenuItem::Cmd { id, label, command } => {
@@ -113,7 +113,9 @@ impl NativeMenu {
             };
         }
         let _ = menu.append(&app_menu);
-        for (title, entries) in menus::native_menu_tree() {
+        let mut tree = menus::native_menu_tree();
+        designcraft_ui_egui::closet::prune_tree(&app.ui, &mut tree);
+        for (title, entries) in tree {
             let sub = Submenu::new(menu_title(app, title), true);
             build(app, &sub, &entries, &mut items, &mut counter, title, &mut recent);
             let _ = menu.append(&sub);
@@ -133,7 +135,7 @@ impl NativeMenu {
             items,
             events,
             last_refresh: 0.0,
-            shown_for: (app.ui.language.clone(), designcraft_ui_egui::cjk_features(app), app.shortcut_recording()),
+            shown_for: (app.ui.language.clone(), designcraft_ui_egui::cjk_features(app), app.shortcut_recording(), app.ui.closet.clone()),
             recent,
             keys,
         }
@@ -191,6 +193,7 @@ impl NativeMenu {
         if app.ui.language != self.shown_for.0
             || designcraft_ui_egui::cjk_features(app) != self.shown_for.1
             || app.shortcut_recording() != self.shown_for.2
+            || app.ui.closet != self.shown_for.3
         {
             let events = std::mem::replace(&mut self.events, channel().1);
             *self = Self::build_bar(app, events);

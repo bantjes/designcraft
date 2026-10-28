@@ -1,6 +1,6 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::json;
-use super::{DesignApp, canvas, chrome, new_document, now_ms, theme, updates_ui};
+use super::{DesignApp, canvas, chrome, new_document, now_ms, theme};
 
 impl DesignApp {
     /// Install the UI fonts on the first frame, and again when the language or the system fonts change.
@@ -26,7 +26,6 @@ impl DesignApp {
     pub(super) fn logic_tick(&mut self, ctx: &egui::Context) {
         self.update_screenshot_epoch(ctx);
         self.drain_control(ctx);
-        updates_ui::tick(self, ctx);
         if self.fonts_ready && !self.host_order_pending() {
             self.drain_inbox();
             self.open_os_documents();

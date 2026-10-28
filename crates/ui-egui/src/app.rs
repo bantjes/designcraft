@@ -7,7 +7,6 @@ use super::{
     ControlRequest, ControlResponse, DesignApp, HashMap, InputGeneration, LivePreview, QuitState, Receiver, SCREENSHOT_MAX_AGGREGATE_BYTES,
     SCREENSHOT_MAX_IMAGE_BYTES, SCREENSHOT_MAX_REQUESTS, ScreenshotGeometry, Sender, Session, ShotRequest, UiRequest, Value, ViewInfo, about, canvas,
     chrome, cursors, dialogs, dock, json, menus, new_document, page_history, panel_docking, shortcut_import, story_editor, theme, toolbar,
-    updates_ui,
 };
 
 mod clipboard;
@@ -114,7 +113,6 @@ impl DesignApp {
             quitting: None,
             cursors: cursors::Images::default(),
             live_preview: LivePreview::default(),
-            updates_rt: updates_ui::Runtime::default(),
         }
     }
 
@@ -291,7 +289,8 @@ impl DesignApp {
         story_editor::show(self, &ctx);
         dialogs::show(self, &ctx);
         about::show(self, &ctx);
-        updates_ui::show(self, &ctx);
+        crate::closet::window(self, &ctx);
+        crate::export_image::window(self, &ctx);
         menus::palette(self, &ctx);
         // The IME is observed once, here: after the canvas, the floating panels, the story editor,
         // dialogs and Quick Apply have all applied this pass's commands and focus changes.

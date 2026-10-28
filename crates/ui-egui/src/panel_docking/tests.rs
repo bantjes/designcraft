@@ -670,7 +670,7 @@ fn paragraph_styles_open_floating_with_character_styles() {
     app.run("window.panel", json!({"panel":"paragraphStyles"})).unwrap();
     let layout = app.ui.docking.clone().unwrap();
     let group = layout.floating.iter().flat_map(window_groups).find(|g| g.panels.iter().any(|p| p == "paragraphStyles")).expect("a floating group");
-    assert_eq!(group.panels, ["characterStyles", "paragraphStyles"]);
+    assert_eq!(group.panels, ["paragraphStyles", "characterStyles"]);
     assert_eq!(group.panels[group.active], "paragraphStyles", "the one chosen is in front");
     // The dock still shows Properties in front.
     assert_eq!(layout.panel_state(&"properties".to_string()), craft_ui::docking::PanelState::Front, "{:?}", layout.root);
@@ -679,7 +679,7 @@ fn paragraph_styles_open_floating_with_character_styles() {
     app.run("window.panel", json!({"panel":"color"})).unwrap();
     app.run("window.panel", json!({"panel":"links"})).unwrap();
     let layout = app.ui.docking.clone().unwrap();
-    assert!(layout.floating.iter().flat_map(window_groups).any(|g| g.panels == ["characterStyles", "paragraphStyles"]));
+    assert!(layout.floating.iter().flat_map(window_groups).any(|g| g.panels == ["paragraphStyles", "characterStyles"]));
     // Once showing, Window › Character Styles brings that tab forward.
     app.run("window.panel", json!({"panel":"characterStyles"})).unwrap();
     let layout = app.ui.docking.clone().unwrap();
@@ -694,7 +694,7 @@ fn paragraph_styles_open_floating_with_character_styles() {
 fn dock_panel_returns_the_floated_styles_group_to_its_icon_group() {
     let mut app = app();
     let docked = app.ui.docking.clone().unwrap_or_else(|| default_layout(&app.ui));
-    let styles = ["characterStyles", "paragraphStyles"].map(String::from).to_vec();
+    let styles = ["paragraphStyles", "characterStyles"].map(String::from).to_vec();
     let icon_groups = |layout: &Layout<String>| -> Vec<Vec<String>> {
         dock_columns(layout).into_iter().filter(|c| c.iconic).flat_map(|c| &c.groups).map(|g| g.panels.clone()).collect()
     };
@@ -717,10 +717,10 @@ fn dock_panel_returns_the_floated_styles_group_to_its_icon_group() {
 fn paragraph_styles_closed_from_the_dock_reopen_there() {
     let mut app = app();
     app.run("window.panel", json!({"panel":"paragraphStyles"})).unwrap();
-    for panel in ["characterStyles", "paragraphStyles"] {
+    for panel in ["paragraphStyles", "characterStyles"] {
         app.run("window.panel.move", json!({"panel": panel, "anchor": "properties"})).unwrap();
     }
-    for panel in ["characterStyles", "paragraphStyles"] {
+    for panel in ["paragraphStyles", "characterStyles"] {
         app.run("window.panel.close", json!({"panel": panel})).unwrap();
     }
     app.run("window.panel", json!({"panel":"paragraphStyles"})).unwrap();
@@ -793,7 +793,7 @@ fn drag_bar(h: &Harness<'static, DesignApp>, first: &str) -> egui::Rect {
     h.ctx.read_response(hit_id(&craft_ui::docking::Hit::DragBar(first.to_string()))).expect("the group's drag bar").rect
 }
 
-/// The docked Character Styles | Paragraph Styles group moves as one by its drag bar: dropped on
+/// The docked Paragraph Styles | Character Styles group moves as one by its drag bar: dropped on
 /// the canvas it floats, dropped on another strip it joins as tabs. Order and the tab in front
 /// are kept.
 #[test]
@@ -802,24 +802,24 @@ fn dragging_a_docked_group_by_its_bar_moves_every_tab() {
     app.run("window.panel", json!({"panel":"paragraphStyles"})).unwrap();
     let below = json!({"MoveGroup": {"panel": "characterStyles", "to": {"At": {"anchor": "properties", "placement": {"Group": {"below": true}}}}}});
     app.run("window.panel.layout", json!({"action": below})).unwrap();
-    let styles = ["characterStyles", "paragraphStyles"];
-    assert_eq!(group_with(app.ui.docking.as_ref().unwrap(), "characterStyles"), (false, styles.map(String::from).to_vec(), 1));
+    let styles = ["paragraphStyles", "characterStyles"];
+    assert_eq!(group_with(app.ui.docking.as_ref().unwrap(), "characterStyles"), (false, styles.map(String::from).to_vec(), 0));
 
     let mut h = harness(app, vec2(1280.0, 800.0));
-    let bar = drag_bar(&h, "characterStyles");
+    let bar = drag_bar(&h, "paragraphStyles");
     drag(&mut h, bar.center(), egui::pos2(400.0, 400.0));
     let layout = h.state().ui.docking.as_ref().unwrap();
-    assert_eq!(group_with(layout, "paragraphStyles"), (true, styles.map(String::from).to_vec(), 1), "{layout:?}");
+    assert_eq!(group_with(layout, "paragraphStyles"), (true, styles.map(String::from).to_vec(), 0), "{layout:?}");
     assert!(valid(layout));
 
-    let bar = drag_bar(&h, "characterStyles");
+    let bar = drag_bar(&h, "paragraphStyles");
     let properties = h.ctx.read_response(tab_id("properties")).unwrap().rect.center();
     drag(&mut h, bar.center(), properties);
     let layout = h.state().ui.docking.as_ref().unwrap();
     let (floating, panels, active) = group_with(layout, "characterStyles");
     assert!(!floating, "{layout:?}");
-    let at = panels.iter().position(|p| p == "characterStyles").unwrap();
-    assert_eq!(panels.get(at + 1).map(String::as_str), Some("paragraphStyles"), "{panels:?}");
+    let at = panels.iter().position(|p| p == "paragraphStyles").unwrap();
+    assert_eq!(panels.get(at + 1).map(String::as_str), Some("characterStyles"), "{panels:?}");
     assert_eq!(panels[active], "paragraphStyles");
     assert!(layout.floating.is_empty(), "{:?}", layout.floating);
 }
@@ -881,7 +881,8 @@ fn placed_panels_leave_their_icon_groups() {
     let column = icon_column(None, &mut placed).unwrap();
     let groups: Vec<Vec<&str>> = column.groups.iter().map(|g| g.panels.iter().map(String::as_str).collect()).collect();
     assert_eq!(groups.first().unwrap(), &["stroke", "color", "gradient"]);
-    assert_eq!(groups.get(1).unwrap(), &["characterStyles", "paragraphStyles"]);
+    assert_eq!(groups.get(1).unwrap(), &["character", "paragraph", "story", "glyphs", "typography"]);
+    assert_eq!(groups.get(2).unwrap(), &["paragraphStyles", "characterStyles"]);
     assert_eq!(groups.len(), ICON_GROUPS.len() - 1);
 }
 

@@ -7,13 +7,13 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>DesignCraft</string>
+  <string>Marian DesignCraft</string>
   <key>CFBundleName</key>
-  <string>DesignCraft</string>
+  <string>Marian DesignCraft</string>
   <key>CFBundleExecutable</key>
-  <string>DesignCraft</string>
+  <string>Marian DesignCraft</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.storyteller.designcraft</string>
+  <string>ai.storyteller.designcraft.marian</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundlePackageType</key>
@@ -29,7 +29,7 @@
   <key>DesignCraftBuildCommit</key>
   <string>@BUILD_SHA@</string>
   <key>CFBundleIconFile</key>
-  <string>DesignCraft</string>
+  <string>Marian DesignCraft</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.graphics-design</string>
   <!-- Must match MACOSX_DEPLOYMENT_TARGET in package.sh. Big Sur is the first release on

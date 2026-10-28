@@ -20,8 +20,8 @@ const fn t(id: &'static str, label: &'static str, shortcut: Option<&'static str>
 /// In two columns InDesign lays some groups out tool by tool (Content Collector and Content
 /// Placer side by side): see [`SPLIT_IN_TWO_COLUMNS`].
 pub const TOOL_GROUPS: &[&[ToolInfo]] = &[
-    &[t("selection", "Selection Tool", Some("V"), "tool-selection")],
-    &[t("directSelection", "Direct Selection Tool", Some("A"), "tool-direct")],
+    // Marian DesignCraft: the black and the white arrow share one button, as in Marian Vectorcraft.
+    &[t("selection", "Selection Tool", Some("V"), "tool-selection"), t("directSelection", "Direct Selection Tool", Some("A"), "tool-direct")],
     &[t("page", "Page Tool", Some("Shift+P"), "tool-page")],
     &[t("gap", "Gap Tool", Some("U"), "tool-gap")],
     &[

@@ -314,6 +314,88 @@ pub(super) fn export_epub(s: &mut Session, p: &Value) -> Result<Value> {
     }
 }
 
+/// Largest resolution and size `file.exportImage` takes.
+const MAX_PPI: f64 = 2400.0;
+const MAX_SCALE_PERCENT: f64 = 1000.0;
+
+/// File › Export Page as JPEG or TIFF: one page rendered at a resolution and size, in sRGB or
+/// Adobe RGB (1998) with the profile embedded.
+pub(super) fn export_image(s: &mut Session, p: &Value) -> Result<Value> {
+    use designcraft_images::export::{ExportOptions, Format, Profile, TiffCompression};
+    const ID: &str = "file.exportImage";
+    let bad = |m: String| bad(ID, m);
+    let num = |key: &str, default: f64, lo: f64, hi: f64| -> Result<f64> {
+        match p.get(key) {
+            None | Some(Value::Null) => Ok(default),
+            Some(v) => {
+                v.as_f64().filter(|v| v.is_finite() && (lo..=hi).contains(v)).ok_or_else(|| bad(format!("{key} must be a number from {lo} to {hi}")))
+            }
+        }
+    };
+    let flag = |key: &str, default: bool| -> Result<bool> {
+        match p.get(key) {
+            None | Some(Value::Null) => Ok(default),
+            Some(v) => v.as_bool().ok_or_else(|| bad(format!("{key} must be true or false"))),
+        }
+    };
+    let text = |key: &str, default: &'static str| -> Result<String> {
+        match p.get(key) {
+            None | Some(Value::Null) => Ok(default.into()),
+            Some(v) => v.as_str().map(str::to_owned).ok_or_else(|| bad(format!("{key} must be a string"))),
+        }
+    };
+    let format = match text("format", "jpeg")?.to_ascii_lowercase().as_str() {
+        "jpeg" | "jpg" => Format::Jpeg { quality: num("quality", 90.0, 1.0, 100.0)?.round() as u8 },
+        "tiff" | "tif" => Format::Tiff {
+            compression: TiffCompression::parse(&text("compression", "lzw")?).ok_or_else(|| bad("compression must be none, lzw or zip".into()))?,
+        },
+        other => return Err(bad(format!("format must be jpeg or tiff, not `{other}`"))),
+    };
+    let profile = Profile::parse(&text("profile", "sRGB")?).ok_or_else(|| bad("profile must be sRGB or adobeRGB".into()))?;
+    let ppi = num("ppi", 300.0, 1.0, MAX_PPI)?;
+    let percent = num("scale", 100.0, 1.0, MAX_SCALE_PERCENT)?;
+    let bleed = flag("bleed", false)?;
+    let rich_black = flag("richBlack", s.prefs.rich_black_output)?;
+    let st = s.doc()?;
+    let d = &st.doc;
+    let count = d.page_count();
+    let page = match p.get("page") {
+        None | Some(Value::Null) => 0,
+        Some(v) => v
+            .as_u64()
+            .and_then(|n| usize::try_from(n).ok())
+            .filter(|n| *n < count)
+            .ok_or_else(|| bad(format!("page must be 0 to {}", count.saturating_sub(1))))?,
+    };
+    let (si, pi) = d.page_loc(page).ok_or_else(|| bad(format!("no page {page}")))?;
+    let page_w = d.spreads.get(si).and_then(|sp| sp.pages.get(pi)).map(|pg| pg.bounds().width()).ok_or_else(|| bad(format!("no page {page}")))?;
+    // Pixels per point: the resolution at the chosen size, or at the width asked for in pixels.
+    let mut scale = ppi / 72.0 * percent / 100.0;
+    if let Some(w) = p.get("width").filter(|v| !v.is_null()) {
+        let w = w
+            .as_f64()
+            .filter(|w| w.is_finite() && *w >= 1.0 && *w <= f64::from(designcraft_render::MAX_SIDE))
+            .ok_or_else(|| bad("width must be 1 or more pixels".into()))?;
+        scale = w / page_w.max(1.0);
+    }
+    let mut r = designcraft_render::Renderer::new();
+    r.threads = designcraft_render::default_threads();
+    let opts = designcraft_render::RenderOptions { printing_only: true, paper: true, rich_black, ..Default::default() };
+    let img = r
+        .render_page(d, &s.cache, page, scale, bleed, &opts)
+        .ok_or_else(|| bad("the image would be too large: lower the resolution or size".into()))?;
+    let options = ExportOptions { format, profile, ppi: ppi.round() as u16 };
+    let bytes = designcraft_images::export::encode_page(&img.to_straight(), img.width, img.height, &options).map_err(EngineError::Other)?;
+    let out = json!({"width": img.width, "height": img.height, "ppi": options.ppi, "bytes": bytes.len()});
+    match p.get("path").and_then(Value::as_str) {
+        Some(path) => {
+            write_file(path, &bytes)?;
+            Ok(crate::cmd::with_param(&out, "path", json!(path)))
+        }
+        None => Ok(crate::cmd::with_param(&out, "base64", json!(crate::cmd::file::base64_encode(&bytes)))),
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn write_file(path: &str, bytes: &[u8]) -> Result<()> {
     crate::io::write_file(path, bytes).map_err(EngineError::Other)

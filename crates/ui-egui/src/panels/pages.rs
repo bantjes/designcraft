@@ -561,16 +561,20 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
     ui.spacing_mut().item_spacing.y = 4.0;
     ui.horizontal(|ui| {
         ui.set_min_height(FOOTER_H - 4.0);
-        crate::rtl::label(
-            ui,
-            egui::RichText::new(
-                crate::i18n::tr(&app.ui.language, "{pages} Pages in {spreads} Spreads")
-                    .replace("{pages}", &doc.page_count().to_string())
-                    .replace("{spreads}", &doc.spreads.len().to_string()),
-            )
-            .size(11.0)
-            .color(t.text_dim),
-        );
+        // A narrow panel keeps its buttons; the count needs about 200 pt.
+        let wide = ui.available_width() >= 200.0;
+        if wide {
+            crate::rtl::label(
+                ui,
+                egui::RichText::new(
+                    crate::i18n::tr(&app.ui.language, "{pages} Pages in {spreads} Spreads")
+                        .replace("{pages}", &doc.page_count().to_string())
+                        .replace("{spreads}", &doc.spreads.len().to_string()),
+                )
+                .size(11.0)
+                .color(t.text_dim),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::button(ui, "trash", 20.0, false, crate::i18n::tr(&app.ui.language, "Delete selected pages")).clicked() {
                 let _ = crate::dialogs::delete_pages(app, vec![cur]);

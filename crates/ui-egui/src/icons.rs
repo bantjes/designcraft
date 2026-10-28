@@ -64,21 +64,60 @@ impl Pen<'_> {
     }
 }
 
-fn arrow(pen: &Pen, hollow: bool) {
+/// The Selection (black) and Direct Selection (white) arrows: black and white in every theme, as
+/// in Marian Vectorcraft, filled first and then outlined in the theme's icon colour so both read on
+/// any background. The arrow is concave, so its fill is a triangulated mesh (egui fills convex
+/// paths only, which drew the arrow as a wedge).
+fn arrow(pen: &Pen, fill: Color32) {
     let pts = [(5.0, 2.5), (5.0, 16.0), (8.4, 12.8), (10.8, 18.0), (13.0, 17.0), (10.6, 11.9), (15.0, 11.6)];
-    if hollow {
-        pen.closed(&pts);
-    } else {
-        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| pen.pt(x, y)).collect();
-        pen.p.add(Shape::Path(egui::epaint::PathShape { points: v, closed: true, fill: pen.c, stroke: egui::epaint::PathStroke::NONE }));
+    let v: Vec<Pos2> = pts.iter().map(|&(x, y)| pen.pt(x, y)).collect();
+    let mut mesh = egui::Mesh::default();
+    for &p in &v {
+        mesh.colored_vertex(p, fill);
     }
+    for [a, b, c] in ear_clip(&v) {
+        mesh.add_triangle(a, b, c);
+    }
+    pen.p.add(Shape::mesh(mesh));
+    pen.closed(&pts);
+}
+
+/// Triangles (vertex indices) covering the simple polygon `v`, by ear clipping.
+fn ear_clip(v: &[Pos2]) -> Vec<[u32; 3]> {
+    let cross = |o: Pos2, a: Pos2, b: Pos2| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    let area: f32 = (0..v.len()).map(|i| cross(Pos2::ZERO, v[i], v[(i + 1) % v.len()])).sum();
+    let sign = if area >= 0.0 { 1.0 } else { -1.0 };
+    let mut idx: Vec<usize> = (0..v.len()).collect();
+    let mut out = Vec::new();
+    let mut guard = 0;
+    while idx.len() > 3 && guard < 4 * v.len() {
+        guard += 1;
+        let n = idx.len();
+        let ear = (0..n).find(|&i| {
+            let (a, b, c) = (v[idx[(i + n - 1) % n]], v[idx[i]], v[idx[(i + 1) % n]]);
+            if cross(a, b, c) * sign <= 0.0 {
+                return false;
+            }
+            idx.iter().all(|&j| {
+                let p = v[j];
+                p == a || p == b || p == c || !(cross(a, b, p) * sign >= 0.0 && cross(b, c, p) * sign >= 0.0 && cross(c, a, p) * sign >= 0.0)
+            })
+        });
+        let Some(i) = ear else { break };
+        out.push([idx[(i + n - 1) % n] as u32, idx[i] as u32, idx[(i + 1) % n] as u32]);
+        idx.remove(i);
+    }
+    if let [a, b, c] = idx[..] {
+        out.push([a as u32, b as u32, c as u32]);
+    }
+    out
 }
 
 /// Icons of one family: paints `name` and says whether it is one of them.
 fn paint_tools(pen: &mut Pen, name: &str) -> bool {
     match name {
-        "tool-selection" => arrow(pen, false),
-        "tool-direct" => arrow(pen, true),
+        "tool-selection" => arrow(pen, Color32::BLACK),
+        "tool-direct" => arrow(pen, Color32::WHITE),
         "tool-page" => {
             pen.closed(&[(5.0, 3.0), (12.0, 3.0), (15.0, 6.0), (15.0, 17.0), (5.0, 17.0)]);
             pen.line(&[(12.0, 3.0), (12.0, 6.0), (15.0, 6.0)]);
@@ -352,6 +391,26 @@ fn paint_panels(pen: &mut Pen, name: &str) -> bool {
             for (x, y) in [(4.0, 4.0), (16.0, 4.0), (4.0, 16.0), (16.0, 16.0), (10.0, 10.0)] {
                 pen.fcircle(x, y, 1.4);
             }
+        }
+        // Marian DesignCraft: the Story panel does one thing, Optical Margin Alignment, and shows
+        // it as an opening quotation mark hanging in the margin.
+        "panel-optical-margin" => {
+            pen.line(&[(3.0, 3.0), (3.0, 17.0)]);
+            pen.text(10.5, 11.5, "\u{201C}", 22.0);
+        }
+        // An I-beam in a text field: Glyphs, set apart from Character's "A" (as in Marian Vectorcraft).
+        "panel-glyphs" => {
+            pen.line(&[(10.8, 6.7), (16.7, 6.7), (18.3, 8.3), (18.3, 11.7), (16.7, 13.3), (10.8, 13.3)]);
+            pen.line(&[(4.2, 13.3), (3.3, 13.3), (1.7, 11.7), (1.7, 8.3), (3.3, 6.7), (4.2, 6.7)]);
+            pen.line(&[(7.5, 5.0), (7.5, 15.0)]);
+            pen.line(&[(5.0, 3.3), (5.8, 3.3), (7.5, 5.0), (9.2, 3.3), (10.0, 3.3)]);
+            pen.line(&[(5.0, 16.7), (5.8, 16.7), (7.5, 15.0), (9.2, 16.7), (10.0, 16.7)]);
+        }
+        // Two overlapping squares, the front one tinted (Marian Vectorcraft's Pathfinder icon).
+        "panel-pathfinder" => {
+            pen.rect(2.5, 2.5, 11.7, 11.7);
+            pen.p.rect_filled(Rect::from_min_max(pen.pt(8.3, 8.3), pen.pt(17.5, 17.5)), 0.0, pen.c.gamma_multiply(0.4));
+            pen.rect(8.3, 8.3, 17.5, 17.5);
         }
         "panel-info" => {
             pen.circle(10.0, 10.0, 7.0);
@@ -1286,20 +1345,45 @@ mod tests {
         assert_ne!(typography, drawing("panel-character"), "Typography draws the Character icon");
     }
 
-    /// Whether the arrow icon `name` paints is filled, from the fill of its one path shape.
-    fn arrow_filled(name: &str) -> bool {
+    /// The colours of the fill mesh the arrow icon `name` paints.
+    fn arrow_fill(name: &str) -> Vec<Color32> {
         let ctx = egui::Context::default();
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-            paint(ui.painter(), Rect::from_min_size(pos2(0.0, 0.0), vec2(20.0, 20.0)), name, Color32::WHITE);
+            paint(ui.painter(), Rect::from_min_size(pos2(0.0, 0.0), vec2(20.0, 20.0)), name, Color32::GRAY);
         });
         out.textures_delta.clear();
-        out.shapes.iter().any(|s| matches!(&s.shape, Shape::Path(p) if p.fill != Color32::TRANSPARENT))
+        out.shapes
+            .iter()
+            .filter_map(|s| match &s.shape {
+                Shape::Mesh(m) => Some(m.vertices.iter().map(|v| v.color).collect::<Vec<_>>()),
+                _ => None,
+            })
+            .flatten()
+            .collect()
     }
 
     #[test]
-    fn selection_arrow_is_filled_and_direct_selection_hollow() {
-        assert!(arrow_filled("tool-selection"), "Selection draws a hollow arrow");
-        assert!(!arrow_filled("tool-direct"), "Direct Selection draws a filled arrow");
+    fn selection_arrow_is_black_and_direct_selection_white_in_every_theme() {
+        let black = arrow_fill("tool-selection");
+        let white = arrow_fill("tool-direct");
+        assert!(!black.is_empty() && black.iter().all(|c| *c == Color32::BLACK), "{black:?}");
+        assert!(!white.is_empty() && white.iter().all(|c| *c == Color32::WHITE), "{white:?}");
+    }
+
+    #[test]
+    fn the_arrow_fill_covers_the_whole_arrow() {
+        // A concave arrow of 7 corners takes 5 triangles; a convex fill would have drawn a wedge.
+        let v: Vec<Pos2> =
+            [(5.0, 2.5), (5.0, 16.0), (8.4, 12.8), (10.8, 18.0), (13.0, 17.0), (10.6, 11.9), (15.0, 11.6)].iter().map(|&(x, y)| pos2(x, y)).collect();
+        let tris = ear_clip(&v);
+        assert_eq!(tris.len(), 5);
+        let area = |[a, b, c]: [u32; 3]| {
+            let (a, b, c) = (v[a as usize], v[b as usize], v[c as usize]);
+            ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)).abs() / 2.0
+        };
+        let poly: f32 = (0..v.len()).map(|i| v[i].x * v[(i + 1) % v.len()].y - v[(i + 1) % v.len()].x * v[i].y).sum::<f32>().abs() / 2.0;
+        let covered: f32 = tris.into_iter().map(area).sum();
+        assert!((covered - poly).abs() < 0.01, "{covered} vs {poly}");
     }
 
     #[test]

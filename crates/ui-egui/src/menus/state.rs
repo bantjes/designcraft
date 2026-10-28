@@ -74,6 +74,9 @@ pub fn shortcut_text(sc: &str) -> String {
 
 /// Check state of a toggle command (None = not a toggle).
 pub fn checked(app: &DesignApp, id: &str, params: &Value) -> Option<bool> {
+    if let Some(open) = crate::closet::checked(app, id) {
+        return Some(open);
+    }
     Some(match id {
         "window.workspace" => params.get("name").and_then(Value::as_str) == Some(app.ui.workspace.as_str()),
         "view.rulers" => app.ui.rulers,

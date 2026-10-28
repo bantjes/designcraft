@@ -14,10 +14,14 @@ pub enum Brightness {
     Light,
     /// Accessibility: black chrome, white text, yellow selection and focus.
     HighContrast,
+    /// Marian DesignCraft's: a dark red frame and toolbar, panels and menus in a deep shade of
+    /// the red, white lettering, the current tool on green.
+    MarianRed,
 }
 
 impl Brightness {
-    pub const ALL: [Brightness; 5] = [Brightness::Dark, Brightness::MediumDark, Brightness::MediumLight, Brightness::Light, Brightness::HighContrast];
+    pub const ALL: [Brightness; 6] =
+        [Brightness::Dark, Brightness::MediumDark, Brightness::MediumLight, Brightness::Light, Brightness::HighContrast, Brightness::MarianRed];
     pub fn label(self) -> &'static str {
         match self {
             Brightness::Dark => "Dark",
@@ -25,6 +29,7 @@ impl Brightness {
             Brightness::MediumLight => "Medium Light",
             Brightness::Light => "Light",
             Brightness::HighContrast => "High Contrast",
+            Brightness::MarianRed => "Marian Red",
         }
     }
     pub fn id(self) -> &'static str {
@@ -34,6 +39,7 @@ impl Brightness {
             Brightness::MediumLight => "mediumLight",
             Brightness::Light => "light",
             Brightness::HighContrast => "highContrast",
+            Brightness::MarianRed => "marianRed",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -257,6 +263,51 @@ impl Tokens {
                 tab_strip: hex(0x000000),
                 ..dark
             },
+            // The page area and rulers stay neutral grey, so colours on the page look true.
+            Brightness::MarianRed => Tokens {
+                app_bar: hex(0x7d1616),
+                panel: hex(0x5e2626),
+                panel_darker: hex(0x4c1d1d),
+                input: hex(0x3b1616),
+                input_border: hex(0xa65d5d),
+                divider: hex(0x481a1a),
+                text: hex(0xffffff),
+                text_strong: hex(0xffffff),
+                text_dim: hex(0xe8c6c6),
+                text_disabled: hex(0xa88080),
+                icon: hex(0xf4e8e8),
+                hover: hex(0x7e3838),
+                tool_active: hex(0x2f9e44),
+                row_selected: hex(0x9c3434),
+                pasteboard: hex(0x5e5e5e),
+                ruler: hex(0x1f1f1f),
+                ruler_tick: hex(0x858585),
+                tab_inactive: hex(0x561e1e),
+                button: hex(0x5e2626),
+                border: hex(0x351010),
+                field_border: hex(0xa65d5d),
+                well: hex(0x351212),
+                well_rim: hex(0x7a3b3b),
+                ruler_text: hex(0xffffff),
+                section_divider: hex(0x481a1a),
+                tab_strip: hex(0x6a1414),
+                ..dark
+            },
+        }
+    }
+
+    /// Marian DesignCraft's Tools panel: the darker red of its icon, light icons, the current
+    /// tool on green (the Selection arrow then paints black, Direct Selection white).
+    pub fn marian_toolbar(self) -> Self {
+        Tokens {
+            panel: hex(0x8b1a1a),
+            divider: hex(0x5e1010),
+            hover: hex(0xa83232),
+            tool_active: hex(0x2f9e44),
+            well: hex(0x2f9e44),
+            well_rim: hex(0x1d6b2c),
+            icon: hex(0xfff4f4),
+            ..self
         }
     }
 }

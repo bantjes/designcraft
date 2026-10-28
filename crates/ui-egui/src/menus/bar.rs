@@ -85,6 +85,7 @@ fn clipped_submenu<'a, R>(
 pub fn menu_bar(app: &mut DesignApp, ui: &mut egui::Ui) {
     let lang = app.ui.language.clone();
     let mut menus = menu_tree();
+    crate::closet::prune_tree(&app.ui, &mut menus);
     if crate::i18n::is_rtl(&lang) {
         menus.reverse();
     }

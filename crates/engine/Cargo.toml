@@ -43,6 +43,7 @@ tempfile = { workspace = true }
 same-file = { workspace = true }
 
 [dev-dependencies]
+image = { workspace = true }
 designcraft-fonts = { workspace = true, features = ["testing"] }
 zip = { workspace = true }
 hayro-syntax = "0.7.2"

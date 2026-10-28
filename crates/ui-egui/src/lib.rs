@@ -6,15 +6,20 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
+/// The app's name wherever it shows: the window title, the menu bar, About and the start screen.
+pub const APP_NAME: &str = "Marian DesignCraft";
+
 pub mod about;
 pub mod canvas;
 pub mod chrome;
+pub mod closet;
 pub mod control;
 pub mod credits;
 pub mod cursors;
 pub mod dialogs;
 pub mod dock;
 pub mod effects_dialog;
+pub mod export_image;
 pub mod i18n;
 pub mod icons;
 pub mod keys;
@@ -36,7 +41,6 @@ pub mod story_editor;
 pub mod taskbar;
 pub mod theme;
 pub mod toolbar;
-pub mod updates_ui;
 pub mod widgets;
 
 use std::collections::HashMap;
@@ -258,7 +262,6 @@ pub struct DesignApp {
     pub cursors: cursors::Images,
     /// A panel's live preview (a slider being dragged), committed when it is let go.
     live_preview: LivePreview,
-    pub(crate) updates_rt: updates_ui::Runtime,
 }
 
 /// The preview a panel opened with `edit.preview`: it stays open while a panel holds it each frame.

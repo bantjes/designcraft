@@ -195,6 +195,19 @@ pub struct UiState {
     pub tagged_frames: bool,
     /// Edit › Menus: hidden menu items (`menu/label`), and Show Full Menus.
     pub hidden_menu_items: Vec<String>,
+    /// Window › Closet: where each tool, panel and menu item moved since the starting sort lives
+    /// (key → `closet::Shelf` name); see `closet`.
+    pub closet: std::collections::BTreeMap<String, String>,
+    /// The Closet window is open.
+    #[serde(skip)]
+    pub closet_open: bool,
+    /// File › Export Page as JPEG or TIFF…: the last choices, whether the window is open and
+    /// the page it exports.
+    pub export_image: crate::export_image::ExportImageSettings,
+    #[serde(skip)]
+    pub export_image_open: bool,
+    #[serde(skip)]
+    pub export_image_page: usize,
     pub show_full_menus: bool,
     /// Scripts panel: saved scripts (name, text).
     pub scripts: Vec<(String, String)>,
@@ -381,13 +394,14 @@ pub struct UiState {
 impl Default for UiState {
     fn default() -> Self {
         UiState {
-            brightness: theme::Brightness::MediumDark,
+            // Marian DesignCraft starts in its own red (the app's own tests keep InDesign's grey).
+            brightness: if crate::closet::sorted() { theme::Brightness::MarianRed } else { theme::Brightness::MediumDark },
             screen_mode: ScreenMode::Normal,
             presentation_return: ScreenMode::Normal,
             presentation_view: None,
             presentation_page: None,
             presentation_history: None,
-            frame_edges: true,
+            frame_edges: false,
             rulers: true,
             guides: true,
             baseline_grid: false,
@@ -396,6 +410,11 @@ impl Default for UiState {
             hidden_characters: false,
             tagged_frames: false,
             hidden_menu_items: Vec::new(),
+            closet: Default::default(),
+            closet_open: false,
+            export_image: Default::default(),
+            export_image_open: false,
+            export_image_page: 0,
             show_full_menus: false,
             story_editor_size: 14.0,
             story_editor_depth_ruler: true,

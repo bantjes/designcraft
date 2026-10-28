@@ -34,10 +34,6 @@ const ALLOWED: &[(&str, &str)] = &[
         "fonts/src/fontdb/system.rs",
         "the installed-font scan reads the platform's fixed font folders (`system_font_dirs`: no command parameter or document field names one), and `load_document_fonts` asks the caller's `allow` check about its folder and each font file before opening either",
     ),
-    (
-        "mcp/src/tools.rs",
-        "`screenshot` reads back the PNG the connected app just wrote. Connected mode cannot be combined with the roots (the CLI refuses the pair), and the app's own engine checks the path it writes",
-    ),
 ];
 
 fn rust_files(dir: &Path, files: &mut Vec<PathBuf>) {

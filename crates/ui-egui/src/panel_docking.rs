@@ -63,6 +63,10 @@ fn normalize(raw: &str) -> Option<&'static str> {
 pub(crate) const CANVAS: &str = "canvas";
 /// Width of an expanded dock column.
 const COLUMN_WIDTH: f32 = 260.0;
+/// The Pages panel's column at the left: narrow, and it can be dragged narrower still
+/// ([`PAGES_MIN_WIDTH`]).
+const PAGES_COLUMN_WIDTH: f32 = 120.0;
+const PAGES_MIN_WIDTH: f32 = 56.0;
 /// Width of an iconic column of bare icons, and of one whose groups show their names.
 const ICON_WIDTH: f32 = 37.0;
 const NAMED_ICON_WIDTH: f32 = 150.0;
@@ -114,9 +118,9 @@ impl Placed {
 const ICON_GROUPS: &[&[&str]] = &[
     &["stroke", "color", "swatches", "gradient"],
     &["effects"],
-    &["characterStyles", "paragraphStyles"],
-    &["character", "paragraph", "typography"],
-    &["glyphs", "story"],
+    // Marian DesignCraft: the text panels in Emma's order.
+    &["character", "paragraph", "story", "glyphs", "typography"],
+    &["paragraphStyles", "characterStyles"],
     &["table"],
     &["textWrap"],
     &["align", "pathfinder"],
@@ -169,6 +173,10 @@ fn with_canvas(columns: Vec<Column<String>>, floating: Vec<Floating<String>>) ->
 /// and Typography (`icon_groups`) have the iconic column only.
 pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
     let mut placed = Placed::default();
+    // Panels put away in the Closet have no place.
+    for panel in crate::closet::hidden_panels(ui) {
+        placed.take(&panel);
+    }
     let mut floating = Vec::new();
     for (id, at) in &ui.floating {
         if at.iter().all(|v| v.is_finite())
@@ -180,6 +188,10 @@ pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
             floating.push(Floating::single(vec![id], 0, [at[0], at[1], 280.0, 360.0]).with_id(window));
         }
     }
+    // Marian DesignCraft: the Pages panel has a narrow column of its own at the left.
+    let pages = (crate::closet::sorted() && ui.icon_groups.is_none()).then(|| placed.take("pages")).flatten();
+    let start =
+        pages.map(|id| Column { groups: vec![Group::new(vec![id], 0)], width: PAGES_COLUMN_WIDTH, iconic: false, iconic_width: Some(ICON_WIDTH) });
     let mut columns = Vec::new();
     if ui.icon_groups.is_none() {
         let panels: Vec<String> = crate::dock::DOCK_TABS.iter().filter_map(|p| placed.take(p.0)).collect();
@@ -198,7 +210,26 @@ pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
         }
     }
     columns.extend(icon_column(ui.icon_groups.as_deref(), &mut placed));
-    with_canvas(columns, floating)
+    let layout = with_canvas(columns, floating);
+    match start {
+        Some(column) => with_start_column(layout, column),
+        None => layout,
+    }
+}
+
+/// `layout` with a dock of one `column` at the logical start edge (the Pages panel's).
+fn with_start_column(layout: Layout<String>, column: Column<String>) -> Layout<String> {
+    let width = column.width;
+    let Some(rest) = layout.root else { return layout };
+    Layout {
+        root: Some(Node::Split {
+            axis: craft_ui::layout::SplitAxis::Horizontal,
+            size: craft_ui::layout::SplitSize::FixedFirst(width),
+            first: Box::new(Node::Dock { side: Side::Start, columns: vec![column] }),
+            second: Box::new(rest),
+        }),
+        floating: layout.floating,
+    }
 }
 
 /// The window id of a default layout's floating `panel`: the same every time, with the top bit
@@ -926,7 +957,7 @@ pub(crate) fn floating_panels(app: &DesignApp) -> Vec<String> {
 
 /// Panels InDesign opens together as one floating group from the Window menu, in tab order:
 /// Window › Styles › Paragraph Styles (or Character Styles) brings both.
-const FLOATING_GROUPS: &[&[&str]] = &[&["characterStyles", "paragraphStyles"]];
+const FLOATING_GROUPS: &[&[&str]] = &[&["paragraphStyles", "characterStyles"]];
 
 /// Window › a panel of a [`FLOATING_GROUPS`] group none of whose panels is showing: the group
 /// opens as one floating window over the right of the canvas, with that panel in front. A group
@@ -1298,7 +1329,11 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
         model_permissions(id)
     }
     fn limits(&self, id: &String) -> craft_ui::docking::PanelLimits {
-        let min = if id == CANVAS { egui::vec2(200.0, 120.0) } else { egui::vec2(220.0, 80.0) };
+        let min = match id.as_str() {
+            CANVAS => egui::vec2(200.0, 120.0),
+            "pages" => egui::vec2(PAGES_MIN_WIDTH, 80.0),
+            _ => egui::vec2(220.0, 80.0),
+        };
         craft_ui::docking::PanelLimits { min, ..Default::default() }
     }
     fn floating_size(&self, id: &String) -> Option<egui::Vec2> {

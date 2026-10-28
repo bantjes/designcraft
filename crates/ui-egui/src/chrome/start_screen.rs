@@ -12,10 +12,7 @@ pub fn start_screen(app: &mut DesignApp, ui: &mut egui::Ui) {
         })),
         |ui| {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                ui.label(crate::rtl::widget(
-                    ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Welcome to DesignCraft")).font(semibold(28.0)).color(t.text_strong),
-                ));
+                ui.label(crate::rtl::widget(ui, egui::RichText::new("Welcome to Marian DesignCraft").font(semibold(28.0)).color(t.text_strong)));
                 ui.label(crate::rtl::widget(
                     ui,
                     egui::RichText::new(crate::i18n::tr(&app.ui.language, "Page layout for print and screen — fast, open and scriptable."))
@@ -63,7 +60,6 @@ pub fn start_screen(app: &mut DesignApp, ui: &mut egui::Ui) {
                     }
                 });
                 ui.add_space(20.0);
-                community_card(app, ui);
                 recent_files(app, ui);
                 ui.add_space(24.0);
                 ui.label(crate::rtl::widget(
@@ -217,56 +213,4 @@ fn recent_preview_texture(ctx: &egui::Context, path: &str, modified: Option<std:
     });
     ctx.data_mut(|d| d.insert_temp::<Cached>(key, (modified, tex.clone())));
     tex
-}
-
-/// Start screen: the ArtCraft community (Discord first) and project links.
-fn community_card(app: &mut DesignApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
-    egui::Frame::NONE.fill(t.panel).corner_radius(10.0).inner_margin(egui::Margin::same(14)).show(ui, |ui| {
-        // Wide enough for the longer translations of the line under the title, with the button
-        // at the right edge; the text wraps before the button's space rather than run under it.
-        const BUTTON: egui::Vec2 = vec2(190.0, 38.0);
-        ui.set_max_width(760.0);
-        ui.horizontal(|ui| {
-            let (r, _) = ui.allocate_exact_size(vec2(44.0, 44.0), Sense::hover());
-            crate::about::paint_mark(ui, r, crate::about::BRAND);
-            ui.add_space(8.0);
-            let label = crate::i18n::tr(&app.ui.language, "Join our Discord");
-            let button = crate::about::discord_button_size(ui.ctx(), label, BUTTON);
-            let text_width = (ui.available_width() - button.x - 16.0).max(120.0);
-            ui.vertical(|ui| {
-                ui.set_max_width(text_width);
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
-                ui.label(crate::rtl::widget(
-                    ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Join the ArtCraft community")).font(semibold(14.0)).color(t.text_strong),
-                ));
-                ui.label(crate::rtl::widget(
-                    ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Get help, share your layouts and shape what we build next."))
-                        .size(12.0)
-                        .color(t.text_dim),
-                ));
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    for (text, id) in [("DesignCraft page", "help.appPage"), ("GitHub", "help.github"), ("getartcraft.com", "help.website")] {
-                        let url = designcraft_engine::links::get(&id[5..]).unwrap_or_default();
-                        let l = ui
-                            .add(egui::Label::new(egui::RichText::new(text).size(12.0).color(t.accent).underline()).sense(Sense::click()))
-                            .on_hover_text(url)
-                            .on_hover_cursor(egui::CursorIcon::PointingHand);
-                        if l.clicked() {
-                            let _ = app.run(id, json!({}));
-                        }
-                        ui.add_space(8.0);
-                    }
-                });
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if crate::about::discord_button(ui, label, BUTTON) {
-                    let _ = app.run("help.discord", json!({}));
-                }
-            });
-        });
-    });
 }

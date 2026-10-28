@@ -2197,7 +2197,7 @@ fn type_panel_items_open_their_panels_and_the_marker_shortcut_inserts_a_page_num
             .floating
             .iter()
             .flat_map(crate::panel_docking::window_groups)
-            .any(|g| g.panels == ["characterStyles", "paragraphStyles"] && g.active == 1)
+            .any(|g| g.panels == ["paragraphStyles", "characterStyles"] && g.active == 0)
     );
     let story = app.run("frame.create", json!({"rect": [36, 36, 200, 100], "content": "text", "text": "Page "})).unwrap()["story"].clone();
     app.run("text.select", json!({"story": story, "anchor": 5, "focus": 5})).unwrap();
@@ -2861,17 +2861,10 @@ fn start_screen_scrolls_when_the_window_is_too_short() {
     assert!(after < before - 50.0, "the start screen should scroll: {before} -> {after}");
 }
 
-// Regression test for #329: on the start screen (no document) the Help menu's links were greyed out.
 #[test]
-fn help_links_are_enabled_without_a_document() {
-    let app = crate::DesignApp::new(designcraft_engine::Session::new(), crate::Services::default());
-    assert!(app.session.active().is_none());
+fn no_help_links_open_the_internet() {
     let ids: Vec<&str> = UI_COMMANDS.iter().map(|c| c.0).filter(|id| id.starts_with("help.")).collect();
-    assert!(ids.contains(&"help.discord") && ids.contains(&"help.github"), "{ids:?}");
-    for id in ids {
-        assert!(menu_enabled(&app, id), "{id} must work from the start screen");
-    }
-    assert!(!menu_enabled(&app, "view.rulers"), "other UI commands still need a document");
+    assert_eq!(ids, ["help.about"], "{ids:?}");
 }
 
 // Regression test for #248: the start screen offered no A6 sheet (it listed only the first ten presets).

@@ -128,9 +128,10 @@ const NOT_SEARCHED: &[&str] = &[
     "window.panel.activate",
     "window.panel.close",
     "window.panel.closeGroup",
-    // A window edge, an app page, a recent file, a swatch or color group.
+    // A window edge, a recent file, a swatch or color group.
     "window.resize",
-    "help.app",
+    // Moving something to or from the Closet names it (Window › Closet… lists them).
+    "closet.set",
     "app.openRecent",
     "app.swatchOptionsDialog",
     "app.colorGroupOptionsDialog",
