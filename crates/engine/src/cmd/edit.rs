@@ -491,6 +491,26 @@ pub fn specs() -> Vec<CommandSpec> {
                 let off = if bool_or(p, "inPlace", false) { 0.0 } else { 12.0 };
                 let to = super::spread_param(p, "edit.paste")?;
                 let from = s.clipboard_origin;
+                // As InDesign's with Paste Remembers Layers off: the objects go onto the layer
+                // being worked on, not the one they were copied from, and never onto a locked or
+                // hidden layer.
+                let st = s.doc()?;
+                let target = st.doc.layer(st.active_layer).map(|l| l.id).unwrap_or_else(|| st.doc.default_layer());
+                if let Some(l) = st.doc.layer(target)
+                    && (l.locked || !l.visible)
+                {
+                    let why = if l.locked { "locked" } else { "hidden" };
+                    return Err(super::bad(
+                        "edit.paste",
+                        format!("the layer \u{201c}{}\u{201d} is {why}: unlock it or choose another layer to paste onto", l.name),
+                    ));
+                }
+                let mut clip = (*clip).clone();
+                if let Some(sp) = clip.spreads.first_mut() {
+                    for it in Arc::make_mut(sp).items.iter_mut() {
+                        onto_layer(Arc::make_mut(it), target, 0);
+                    }
+                }
                 let ids: Vec<ItemId> = clip.spreads.first().map(|sp| sp.items.iter().map(|i| i.id).collect()).unwrap_or_default();
                 s.edit(|d, sel| {
                     // The same place on another spread is the same distance from its spine or left edge.
@@ -534,6 +554,19 @@ pub fn specs() -> Vec<CommandSpec> {
             ok()
         }),
     ]
+}
+
+/// `it` and everything inside it on layer `l` (nesting is bounded as copies are).
+fn onto_layer(it: &mut designcraft_doc::Item, l: designcraft_doc::LayerId, depth: usize) {
+    it.layer = l;
+    if depth > 64 {
+        return;
+    }
+    if let Some(children) = it.children_mut() {
+        for c in children.iter_mut() {
+            onto_layer(Arc::make_mut(c), l, depth + 1);
+        }
+    }
 }
 
 /// Put the selected items on the clipboard, with the x Paste measures them from on their spread.
@@ -803,6 +836,27 @@ mod paste_tests {
     }
 
     /// Paste and Paste in Place put the objects on the spread they are given (the first without one).
+    #[test]
+    fn paste_goes_onto_the_active_layer_and_never_a_locked_one() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({})).unwrap();
+        let id = s.execute("frame.create", &json!({"rect": [72, 72, 200, 200]})).unwrap()["id"].as_u64().unwrap();
+        let first = s.doc().unwrap().doc.item(ItemId(id)).unwrap().layer;
+        s.execute("selection.set", &json!({"ids": [id]})).unwrap();
+        s.execute("edit.copy", &json!({})).unwrap();
+        // A new layer is the active one: the copy goes there, not onto the layer it came from.
+        s.execute("layer.new", &json!({})).unwrap();
+        let active = s.doc().unwrap().active_layer;
+        assert_ne!(active, first);
+        let pasted = s.execute("edit.paste", &json!({})).unwrap()["ids"][0].as_u64().unwrap();
+        assert_eq!(s.doc().unwrap().doc.item(ItemId(pasted)).unwrap().layer, active);
+        // A locked layer takes nothing.
+        s.execute("layer.set", &json!({"id": active.0, "locked": true})).unwrap();
+        let count = s.doc().unwrap().doc.spreads[0].items.len();
+        assert!(s.execute("edit.paste", &json!({})).is_err());
+        assert_eq!(s.doc().unwrap().doc.spreads[0].items.len(), count);
+    }
+
     #[test]
     fn paste_puts_the_objects_on_the_given_spread() {
         let mut s = Session::new();

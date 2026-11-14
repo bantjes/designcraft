@@ -252,6 +252,36 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
     dirs
 }
 
+/// A fingerprint of the font folders `dirs`: each folder's and its subfolders' modification
+/// times. It changes when a font is installed or removed there (Font Book copies into, or deletes
+/// from, one of them), so polling it tells when to reload the fonts. Bounded: at most 4,096
+/// folders are looked at.
+pub fn font_dirs_signature(dirs: &[std::path::PathBuf]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    let mut seen = 0usize;
+    let mut stack: Vec<(std::path::PathBuf, usize)> = dirs.iter().map(|d| (d.clone(), 0)).collect();
+    while let Some((dir, depth)) = stack.pop() {
+        seen += 1;
+        if seen > 4096 {
+            break;
+        }
+        let Ok(meta) = std::fs::metadata(&dir) else {
+            dir.hash(&mut h);
+            0u8.hash(&mut h);
+            continue;
+        };
+        dir.hash(&mut h);
+        meta.modified().ok().hash(&mut h);
+        if depth < 2
+            && let Ok(entries) = std::fs::read_dir(&dir)
+        {
+            stack.extend(entries.flatten().filter(|e| e.file_type().is_ok_and(|t| t.is_dir())).map(|e| (e.path(), depth + 1)));
+        }
+    }
+    h.finish()
+}
+
 pub(super) fn unix_font_dirs(home: Option<&std::path::Path>, xdg_data_home: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
     let mut dirs: Vec<std::path::PathBuf> = ["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into).into();
     if let Some(home) = home {

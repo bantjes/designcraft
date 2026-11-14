@@ -34,6 +34,10 @@ impl DesignApp {
             self.drain_inbox();
             self.open_os_documents();
             self.poll_link_checks(ctx);
+            #[cfg(not(target_arch = "wasm32"))]
+            if self.fonts_system {
+                crate::font_watch::tick(self, ctx);
+            }
         }
         if self.host_order_pending() {
             ctx.request_repaint();

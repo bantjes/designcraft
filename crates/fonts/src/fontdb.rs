@@ -148,7 +148,7 @@ use system::file_face_names;
 use system::unix_font_dirs;
 #[cfg(not(target_arch = "wasm32"))]
 use system::{CatalogEntry, FileStamp};
-pub use system::{ReloadedFonts, system_font_dirs};
+pub use system::{ReloadedFonts, font_dirs_signature, system_font_dirs};
 
 impl OutlinePen for FlipPen {
     fn move_to(&mut self, x: f32, y: f32) {
