@@ -73,6 +73,22 @@ impl NumKind<'_> {
     }
 }
 
+/// The narrowest field that gets the up/down arrows everywhere (Marian).
+const SPIN_MIN_WIDTH: f32 = 56.0;
+
+/// One step up (`dir` > 0) or down from `v`, landing on a whole number of steps: with a step of
+/// 1, 14.4 goes up to 15 then 16, and down to 14 then 13.
+pub fn round_step(v: f64, step: f64, dir: f64) -> f64 {
+    if !v.is_finite() || !step.is_finite() || step <= 0.0 {
+        return v;
+    }
+    let n = v / step;
+    // A value a hair off a whole step (float noise from unit conversion) counts as on it.
+    let n = if (n - n.round()).abs() < 1e-6 { n.round() } else { n };
+    let whole = if dir > 0.0 { n.floor() + 1.0 } else { n.ceil() - 1.0 };
+    whole * step
+}
+
 /// A numeric field. Build with [`NumField::measure`] / [`NumField::number`], then [`NumField::show`].
 pub struct NumField<'a> {
     id: &'a str,
@@ -216,7 +232,7 @@ impl<'a> NumField<'a> {
             });
             if resp.clicked() {
                 let mul = if ui.input(|i| i.modifiers.shift) { 10.0 } else { 1.0 };
-                out = Some(clamp(self.value.unwrap_or(0.0) + dir * step * mul));
+                out = Some(clamp(round_step(self.value.unwrap_or(0.0), step * mul, dir)));
             }
         }
         out
@@ -224,7 +240,11 @@ impl<'a> NumField<'a> {
 
     /// Like [`NumField::show`]; a field emptied while it had a value commits `Some(None)` (for
     /// values that may be unset, like a character style's attributes).
-    pub fn show_or_clear(self, ui: &mut Ui) -> Option<Option<f64>> {
+    pub fn show_or_clear(mut self, ui: &mut Ui) -> Option<Option<f64>> {
+        // Marian: every number field with room for them has the up/down arrows.
+        if crate::closet::sorted() && self.width >= SPIN_MIN_WIDTH {
+            self.spinner = true;
+        }
         let t = Tokens::get(ui.ctx());
         let name = self.name.unwrap_or(self.id);
         let enabled = self.enabled && ui.is_enabled();
@@ -292,7 +312,7 @@ impl<'a> NumField<'a> {
             });
             if up || down {
                 let base = self.parse(&buf).or(self.value).unwrap_or(0.0);
-                let v = clamp(base + if up { step } else { -step } * if shift { 10.0 } else { 1.0 });
+                let v = clamp(round_step(base, step * if shift { 10.0 } else { 1.0 }, if up { 1.0 } else { -1.0 }));
                 buf = self.fmt(v);
                 out = Some(v);
             }
@@ -722,6 +742,18 @@ pub fn overflow_scrolling(ui: &mut Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn steps_land_on_round_numbers() {
+        assert_eq!(round_step(14.4, 1.0, 1.0), 15.0);
+        assert_eq!(round_step(15.0, 1.0, 1.0), 16.0);
+        assert_eq!(round_step(14.4, 1.0, -1.0), 14.0);
+        assert_eq!(round_step(14.0, 1.0, -1.0), 13.0);
+        assert_eq!(round_step(14.4, 10.0, 1.0), 20.0, "Shift steps by tens");
+        assert_eq!(round_step(-0.5, 1.0, 1.0), 0.0);
+        assert!((round_step(3.0 * 0.1, 0.1, 1.0) - 0.4).abs() < 1e-9, "float noise counts as on the step");
+        assert!(round_step(f64::NAN, 1.0, 1.0).is_nan());
+    }
 
     fn run(ctx: &egui::Context, events: Vec<egui::Event>, mods: egui::Modifiers, f: &mut dyn FnMut(&mut Ui)) {
         let raw = egui::RawInput {
