@@ -341,6 +341,22 @@ mod tcy_tests {
     }
 
     #[test]
+    fn all_caps_toggles_on_the_selection() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({})).unwrap();
+        let r = s.execute("frame.create", &json!({"rect": [72, 72, 300, 200], "content": "text", "text": "quiet art"})).unwrap();
+        let sid = r["story"].as_u64().unwrap();
+        s.execute("text.select", &json!({"story": sid, "anchor": 0, "focus": 5})).unwrap();
+        let get = |s: &Session| s.doc().unwrap().doc.stories[&designcraft_doc::StoryId(sid)].char_format_at(1).over.capitalization;
+        s.execute("type.allCaps", &json!({})).unwrap();
+        assert_eq!(get(&s), Some(designcraft_doc::Capitalization::AllCaps));
+        s.execute("type.allCaps", &json!({})).unwrap();
+        assert_eq!(get(&s), Some(designcraft_doc::Capitalization::Normal), "a second Cmd-Shift-K undoes all caps");
+        s.execute("type.allCaps", &json!({"on": true})).unwrap();
+        assert_eq!(get(&s), Some(designcraft_doc::Capitalization::AllCaps));
+    }
+
+    #[test]
     fn ruby_and_kenten_on_the_selection() {
         let mut s = Session::new();
         s.execute("file.new", &json!({})).unwrap();

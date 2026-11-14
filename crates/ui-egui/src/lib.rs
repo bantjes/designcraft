@@ -20,6 +20,7 @@ pub mod dialogs;
 pub mod dock;
 pub mod effects_dialog;
 pub mod export_batch_dialog;
+pub mod export_choice;
 pub mod export_image;
 pub mod i18n;
 pub mod icons;

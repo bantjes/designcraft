@@ -283,10 +283,26 @@ pub fn specs() -> Vec<CommandSpec> {
             swap_fill_stroke
         ),
         cmd!("type.underline", "Underline", [], Some("Cmd+Shift+U"), "{}", has_text_or_frames, |s, _| format_chars(s, &json!({"underline": true}))),
-        cmd!("type.allCaps", "All Caps", [], Some("Cmd+Shift+K"), "{}", has_text_or_frames, |s, _| format_chars(
-            s,
-            &json!({"capitalization": "allCaps"})
-        )),
+        cmd!(
+            "type.allCaps",
+            "All Caps",
+            [],
+            Some("Cmd+Shift+K"),
+            "{on?: bool} — the selected text in all capitals (toggles by default: text already in all caps goes back to normal)",
+            has_text_or_frames,
+            |s, p| {
+                let on = match p.get("on").and_then(Value::as_bool) {
+                    Some(v) => v,
+                    None => !format_targets(s).first().is_some_and(|t| {
+                        s.doc().ok().and_then(|d| d.doc.text_story(t.story, t.cell)).is_some_and(|st| {
+                            st.char_format_at(if t.range.is_empty() { t.range.start } else { t.range.start + 1 }).over.capitalization
+                                == Some(designcraft_doc::Capitalization::AllCaps)
+                        })
+                    }),
+                };
+                format_chars(s, &json!({"capitalization": if on { "allCaps" } else { "normal" }}))
+            }
+        ),
         cmd!(
             "type.tateChuYoko",
             "Tate-Chu-Yoko",

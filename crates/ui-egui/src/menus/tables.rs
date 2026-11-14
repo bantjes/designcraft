@@ -19,6 +19,7 @@ pub const MENUS: &[(&str, &[&str])] = &[
             "ui:app.contactSheetDialog",
             "ui:app.placeWithOptions",
             "-",
+            "ui:app.exportDialog",
             "ui:app.exportPdf",
             "ui:app.exportBatch",
             "ui:app.packageDialog",

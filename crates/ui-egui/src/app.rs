@@ -299,6 +299,7 @@ impl DesignApp {
         about::show(self, &ctx);
         crate::closet::window(self, &ctx);
         crate::export_image::window(self, &ctx);
+        crate::export_choice::window(self, &ctx);
         menus::palette(self, &ctx);
         // The IME is observed once, here: after the canvas, the floating panels, the story editor,
         // dialogs and Quick Apply have all applied this pass's commands and focus changes.

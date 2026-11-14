@@ -87,8 +87,10 @@ fn run_ui_inner(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
     if is_window_control(id) && !window_control_available(app, id) {
         return Some(Err("custom window controls are not available in this host".into()));
     }
-    if let Some(result) =
-        crate::closet::command(app, id, p).or_else(|| crate::closet::refuse_tool(&app.ui, id, p)).or_else(|| crate::export_image::command(app, id, p))
+    if let Some(result) = crate::closet::command(app, id, p)
+        .or_else(|| crate::closet::refuse_tool(&app.ui, id, p))
+        .or_else(|| crate::export_image::command(app, id, p))
+        .or_else(|| crate::export_choice::command(app, id, p))
     {
         return Some(result);
     }
@@ -1104,7 +1106,10 @@ fn run_ui_part5(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
             app.ui.about = p.get("open").and_then(Value::as_bool).unwrap_or(true);
             Ok(json!(app.ui.about))
         }
-        "window.toolsDoubleColumn" => flag(&mut app.ui.tools_double_column),
+        "window.toolsDoubleColumn" => {
+            app.ui.tools_double_column = p.get("on").and_then(Value::as_bool).unwrap_or(!app.ui.tools_double_column);
+            Ok(json!(app.ui.tools_double_column))
+        }
         "window.newWorkspace" => {
             let Some(name) = p.get("name").and_then(Value::as_str).map(str::trim).filter(|n| !n.is_empty()) else {
                 app.ui.dialog =

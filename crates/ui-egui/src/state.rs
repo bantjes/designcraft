@@ -208,6 +208,10 @@ pub struct UiState {
     pub export_image_open: bool,
     #[serde(skip)]
     pub export_image_page: usize,
+    /// File › Export… (Cmd-E): the format chosen last, and whether the window is open.
+    pub export_choice: String,
+    #[serde(skip)]
+    pub export_choice_open: bool,
     pub show_full_menus: bool,
     /// Scripts panel: saved scripts (name, text).
     pub scripts: Vec<(String, String)>,
@@ -413,7 +417,7 @@ impl Default for UiState {
             presentation_view: None,
             presentation_page: None,
             presentation_history: None,
-            frame_edges: false,
+            frame_edges: !crate::closet::sorted(),
             rulers: true,
             guides: true,
             baseline_grid: false,
@@ -427,6 +431,8 @@ impl Default for UiState {
             export_image: Default::default(),
             export_image_open: false,
             export_image_page: 0,
+            export_choice: "pdf".into(),
+            export_choice_open: false,
             show_full_menus: false,
             story_editor_size: 14.0,
             story_editor_depth_ruler: true,

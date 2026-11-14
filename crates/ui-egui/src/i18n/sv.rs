@@ -2,6 +2,14 @@
 //! Swedish software vocabulary; no other catalog and no proprietary localisation was used.
 //! AI-drafted with Claude Code; spot-checked by a native Swedish speaker, not every string reviewed.
 pub(super) const TABLE: &[(&str, &str)] = &[
+    // Marian DesignCraft
+    ("Quit Marian DesignCraft", "Avsluta Marian DesignCraft"),
+    ("About Marian DesignCraft", "Om Marian DesignCraft"),
+    ("Export Page as TIFF or JPEG…", "Exportera sida som TIFF eller JPEG…"),
+    ("Export…", "Exportera…"),
+    ("Marian Red", "Marian-röd"),
+    ("Closet…", "Garderob…"),
+    ("Optical Margin", "Optisk marginal"),
     ("File", "Arkiv"),
     ("Edit", "Redigera"),
     ("Layout", "Layout"),

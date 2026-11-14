@@ -54,7 +54,13 @@ pub const UI_COMMANDS: &[(&str, &str, Option<&str>, &str)] = &[
         "{dir?} — the Package dialog (what the package carries, printing instructions), then the folder to create; with dir, packages into it at once (file.package)",
     ),
     ("app.saveSwatches", "Save Swatches for Exchange…", None, "{path?} — write the colour swatches as .ase"),
-    ("app.exportPng", "Export Page as PNG…", Some("Cmd+E"), "{}"),
+    (
+        "app.exportDialog",
+        "Export…",
+        Some("Cmd+E"),
+        "{show?, format?: pdf|interactivePdf|image|png|epub|fixedEpub|html|idml|pptx|xml} — choose what to export the document as; with format, export in it at once",
+    ),
+    ("app.exportPng", "Export Page as PNG…", None, "{}"),
     (
         "app.exportImage",
         "Export Page as TIFF or JPEG…",
@@ -410,7 +416,7 @@ pub const UI_COMMANDS: &[(&str, &str, Option<&str>, &str)] = &[
         None,
         "{open?: true, tab?: \"about\"|\"contributors\"|\"models\"} — the About window: splash with community links, contributor and model credits (open: false closes it)",
     ),
-    ("window.toolsDoubleColumn", "Tools: Double Column", None, "{}"),
+    ("window.toolsDoubleColumn", "Tools: Double Column", None, "{on?: bool (default: toggle)} → whether the Tools panel has two columns"),
     ("window.closet", "Closet…", None, "{show?} — the Closet and Basement: tools, panels and menu items put away, one click from coming back"),
     (
         "closet.set",
