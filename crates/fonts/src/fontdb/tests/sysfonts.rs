@@ -208,7 +208,7 @@ fn fonts_the_platform_lists_outside_the_font_folders_are_cataloged_once() {
     std::fs::create_dir_all(service.join(".r")).unwrap();
     std::fs::write(service.join(".r/.12345"), renamed("SourceSans3-It.ttf")).unwrap();
     let db = FontDb { font_files: service_files, ..FontDb::with_font_dirs(vec![dir]) };
-    assert_eq!(db.styles(FAMILY), ["Regular", "Bold", "Italic"]);
+    assert_eq!(db.styles(FAMILY), ["Regular", "Italic", "Bold"], "each roman before its italic, by weight");
     assert_eq!(db.load_system_fonts(), 3, "the font folder's Regular listed again isn't cataloged twice");
     let italic = db.face(FAMILY, "Italic");
     assert_eq!(italic.style, "Italic");

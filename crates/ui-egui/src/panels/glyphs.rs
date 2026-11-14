@@ -17,20 +17,31 @@ struct State {
     style: String,
     query: String,
     recent: Vec<char>,
+    /// The font at the text cursor when the panel last followed it.
+    followed: Option<(String, String)>,
 }
 
 pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let id = egui::Id::unique("glyphs_panel");
     let mut st: State = ui.data(|d| d.get_temp(id)).unwrap_or_default();
-    // Default to the font at the text cursor.
+    // The font at the text cursor: the panel shows it, and follows it whenever the cursor moves
+    // into other type (a font picked here stays until then).
+    let a = super::text_attrs(app);
+    let at_cursor = a.as_ref().and_then(|a| {
+        let family = a["chars"]["fontFamily"].as_str()?.to_string();
+        let style = a["chars"]["fontStyle"].as_str().map_or_else(|| "Regular".to_string(), str::to_string);
+        Some((family, style))
+    });
+    if let Some(cur) = at_cursor
+        && st.followed.as_ref() != Some(&cur)
+    {
+        (st.family, st.style) = cur.clone();
+        st.followed = Some(cur);
+    }
     if st.family.is_empty() {
-        let a = super::text_attrs(app);
-        st.family = a
-            .as_ref()
-            .and_then(|a| a["chars"]["fontFamily"].as_str().map(str::to_string))
-            .unwrap_or_else(|| designcraft_fonts::DEFAULT_FAMILY.into());
-        st.style = a.as_ref().and_then(|a| a["chars"]["fontStyle"].as_str().map(str::to_string)).unwrap_or_else(|| "Regular".into());
+        st.family = designcraft_fonts::DEFAULT_FAMILY.into();
+        st.style = "Regular".into();
     }
     let (db, scope) = (super::fonts(app), super::font_scope(app));
     ui.horizontal(|ui| {
@@ -209,5 +220,27 @@ mod tests {
             assert!(grid.right() <= panel.right() - bar + 0.5, "{width}: the grid {grid:?} runs under the scroll bar of {panel:?}");
             assert!(grid.right() > panel.right() - bar - CELL, "{width}: no column is left out ({grid:?})");
         }
+    }
+
+    /// Emma: Glyphs shows the font she's typing in, and follows the cursor into other type.
+    #[test]
+    fn glyphs_follow_the_font_at_the_text_cursor() {
+        let mut app = DesignApp::new(designcraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({})).unwrap();
+        let a = app.run("frame.create", json!({"rect": [72, 72, 300, 200], "content": "text", "text": "serif"})).unwrap()["story"].as_u64().unwrap();
+        let b = app.run("frame.create", json!({"rect": [72, 300, 300, 400], "content": "text", "text": "sans"})).unwrap()["story"].as_u64().unwrap();
+        app.run("text.select", json!({"story": b, "anchor": 0, "focus": 4})).unwrap();
+        app.run("type.char", json!({"attrs": {"fontFamily": designcraft_fonts::FALLBACK_FAMILY, "fontStyle": "Regular"}})).unwrap();
+        let ctx = egui::Context::default();
+        let family = |app: &mut DesignApp| {
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| show(app, ui));
+            out.textures_delta.clear();
+            ctx.data(|d| d.get_temp::<State>(egui::Id::unique("glyphs_panel"))).unwrap().family
+        };
+        app.run("text.select", json!({"story": a, "anchor": 1, "focus": 1})).unwrap();
+        let first = family(&mut app);
+        app.run("text.select", json!({"story": b, "anchor": 1, "focus": 1})).unwrap();
+        assert_eq!(family(&mut app), designcraft_fonts::FALLBACK_FAMILY);
+        assert_ne!(first, designcraft_fonts::FALLBACK_FAMILY, "the first frame's font, not the second's");
     }
 }

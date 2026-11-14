@@ -728,3 +728,21 @@ mod coverage_recommendation_tests {
         assert!(!scope.has_family("Traditional Arabic"));
     }
 }
+
+#[cfg(test)]
+mod style_order_tests {
+    use super::*;
+
+    /// Emma: a family lists Book, Book Italic, Bold, Bold Italic…, not every roman then every italic.
+    #[test]
+    fn styles_list_each_roman_then_its_italic_by_weight() {
+        let db = FontDb::with_font_dirs(Vec::new());
+        for (style, weight) in [("Bold Italic", 700), ("Book", 400), ("Bold", 700), ("Book Italic", 400), ("Light", 300)] {
+            let bytes = testing::font_with("Order Text", &['A']).unwrap();
+            let bytes = testing::with_names(&bytes, &[(3, 1, 0x409, 1, "Order Text"), (3, 1, 0x409, 2, style)]).unwrap();
+            let bytes = testing::with_table_u16(bytes, b"OS/2", 4, weight).unwrap();
+            db.add_font(bytes);
+        }
+        assert_eq!(db.styles("Order Text"), ["Light", "Book", "Book Italic", "Bold", "Bold Italic"]);
+    }
+}

@@ -150,7 +150,7 @@ impl ScopedFonts<'_> {
         out
     }
 
-    /// Style names available for `family` (Regular first, then by weight).
+    /// Style names available for `family`, lightest first, each roman before its italic.
     pub fn styles(&self, family: &str) -> Vec<String> {
         self.style_traits(family).into_iter().map(|t| t.2).collect()
     }
@@ -233,7 +233,9 @@ impl ScopedFonts<'_> {
                 v.push((style_italic(style), style_weight(style), style.to_string()));
             }
         }
-        v.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.cmp(&b.2)));
+        // Marian DesignCraft: by weight, each roman followed by its italic (Book, Book Italic,
+        // Bold, Bold Italic), as Emma reads a family.
+        v.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)).then(a.2.cmp(&b.2)));
         v.dedup_by(|a, b| a.2 == b.2);
         v
     }
