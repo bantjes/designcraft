@@ -471,6 +471,48 @@ fn list(ui: &UiState, shelf: Option<Shelf>) -> Value {
 /// The window's tabs.
 const TABS: [&str; 3] = ["Closet", "Basement", "Everything"];
 
+/// Paints a little panelled door in `rect`: brown for the Closet, black for the Basement
+/// (Emma's choice, 14 November 2026). Drawn in code; other shelves paint nothing.
+pub fn paint_door(p: &egui::Painter, rect: egui::Rect, shelf: Shelf) {
+    use egui::{Color32, Stroke, StrokeKind, pos2, vec2};
+    let (wood, frame, panel, knob) = match shelf {
+        Shelf::Closet => (
+            Color32::from_rgb(0x8b, 0x5a, 0x2b),
+            Color32::from_rgb(0x4e, 0x2f, 0x14),
+            Color32::from_rgb(0xb5, 0x7f, 0x48),
+            Color32::from_rgb(0xe0, 0xb8, 0x4a),
+        ),
+        Shelf::Basement => (
+            Color32::from_rgb(0x16, 0x16, 0x16),
+            Color32::from_rgb(0x00, 0x00, 0x00),
+            Color32::from_rgb(0x55, 0x55, 0x55),
+            Color32::from_rgb(0xc8, 0xc8, 0xc8),
+        ),
+        Shelf::InUse => return,
+    };
+    if !(rect.width() > 2.0 && rect.height() > 2.0) {
+        return;
+    }
+    // A door is about five eighths as wide as it is tall.
+    let h = rect.height().min(rect.width() / 0.62);
+    let door = egui::Rect::from_center_size(rect.center(), vec2(h * 0.62, h));
+    p.rect(door, 1.0, wood, Stroke::new((h / 14.0).max(1.0), frame), StrokeKind::Inside);
+    // Two panels: a taller upper one and a lower one.
+    let m = door.width() * 0.2;
+    let line = Stroke::new((h / 18.0).max(0.8), panel);
+    let upper = egui::Rect::from_min_max(pos2(door.min.x + m, door.min.y + h * 0.12), pos2(door.max.x - m, door.min.y + h * 0.5));
+    let lower = egui::Rect::from_min_max(pos2(door.min.x + m, door.min.y + h * 0.6), pos2(door.max.x - m, door.max.y - h * 0.1));
+    p.rect_stroke(upper, 0.5, line, StrokeKind::Inside);
+    p.rect_stroke(lower, 0.5, line, StrokeKind::Inside);
+    p.circle_filled(pos2(door.max.x - door.width() * 0.13, door.min.y + h * 0.55), (h / 16.0).max(1.0), knob);
+}
+
+/// A door icon of `size` points and then `label`, as one clickable row piece.
+fn door_label(ui: &mut egui::Ui, shelf: Shelf, size: f32) {
+    let (r, _) = ui.allocate_exact_size(egui::vec2(size * 0.7, size), egui::Sense::hover());
+    paint_door(ui.painter(), r, shelf);
+}
+
 fn tab_id() -> egui::Id {
     egui::Id::unique("closet-tab")
 }
@@ -514,6 +556,11 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 for (i, name) in TABS.iter().enumerate() {
+                    match i {
+                        0 => door_label(ui, Shelf::Closet, 16.0),
+                        1 => door_label(ui, Shelf::Basement, 16.0),
+                        _ => {}
+                    }
                     if ui.selectable_label(tab == i, RichText::new(tr(name)).size(12.5)).clicked() {
                         tab = i;
                     }
@@ -569,6 +616,8 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
                                 if ui.small_button(tr(label)).clicked() {
                                     moves.push((th.key.clone(), to));
                                 }
+                                // Right to left: the door goes before its button.
+                                door_label(ui, to, 14.0);
                             }
                             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                                 ui.add(egui::Label::new(RichText::new(crate::i18n::tr(&lang, &th.label)).color(t.text)).truncate());

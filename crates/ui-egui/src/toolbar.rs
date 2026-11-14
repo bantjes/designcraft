@@ -558,6 +558,22 @@ fn fill_stroke_proxy(app: &mut DesignApp, ui: &mut egui::Ui, width: f32, cols: u
         });
     });
     separator(ui, &t);
+    // Marian DesignCraft: the Closet's door, where the things put away are.
+    if crate::closet::sorted() {
+        ui.vertical_centered(|ui| {
+            let (r, resp) = ui.allocate_exact_size(vec2(BTN, BTN), Sense::click());
+            if resp.hovered() {
+                ui.painter().rect_filled(r, 2.0, t.hover);
+            }
+            crate::closet::paint_door(ui.painter(), r.shrink(2.0), crate::closet::Shelf::Closet);
+            let tip = crate::i18n::tr(&app.ui.language, "Closet…");
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
+            if resp.on_hover_text(tip).clicked() {
+                let _ = app.run("window.closet", json!({}));
+            }
+        });
+        separator(ui, &t);
+    }
     // Screen Mode: Normal and Preview (with Bleed, Slug and Presentation) side by side in two
     // columns, as InDesign's; one well with the five in its flyout in one column.
     let (row, _) = ui.allocate_exact_size(vec2(width, 22.0), Sense::hover());
