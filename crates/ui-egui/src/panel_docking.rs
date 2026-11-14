@@ -121,6 +121,7 @@ const ICON_GROUPS: &[&[&str]] = &[
     // Marian DesignCraft: the text panels in Emma's order.
     &["character", "paragraph", "story", "glyphs", "typography"],
     &["paragraphStyles", "characterStyles"],
+    &["objectStyles"],
     &["table"],
     &["textWrap"],
     &["align", "pathfinder"],
@@ -547,7 +548,7 @@ pub(crate) fn command(app: &mut DesignApp, id: &str, params: &Value) -> Option<R
         if flyout_open(app, "table") {
             return Some(Ok(close_flyout(app)));
         }
-        let id = if showing(app, "table") { "window.panel.close" } else { "window.panel.activate" };
+        let id = if app.ui.hidden_panels == 0 && showing(app, "table") { "window.panel.close" } else { "window.panel.activate" };
         return Some(shared_command(app, id, &json!({"panel": "table"})));
     }
     if id == "window.collapseToIcons" {
@@ -576,7 +577,7 @@ pub(crate) fn command(app: &mut DesignApp, id: &str, params: &Value) -> Option<R
 
 /// Is `panel` showing in the open flyout of an iconic column?
 fn flyout_open(app: &DesignApp, panel: &str) -> bool {
-    app.ui.docking_flyout.as_deref() == Some(panel) && in_iconic_column(&layout_of(app), panel)
+    app.ui.hidden_panels == 0 && app.ui.docking_flyout.as_deref() == Some(panel) && in_iconic_column(&layout_of(app), panel)
 }
 
 /// Close the open flyout; the layout is unchanged.
@@ -856,6 +857,7 @@ impl Transaction {
         release_closed(app, &closed);
         keep_float_only(app);
         if let Some(panel) = reveal {
+            app.ui.hidden_panels = 0;
             app.ui.docking_opened = Some(panel.clone());
             app.ui.docking_raise = Some(panel);
             app.ui.docking_flyout = flyout;
@@ -935,6 +937,7 @@ fn float_only_panel(app: &mut DesignApp, id: &str, panel: &str, params: &Value) 
     };
     app.ui.floating.retain(|(p, _)| p != panel);
     if let Some(at) = at {
+        app.ui.hidden_panels = 0;
         app.ui.floating.push((panel.to_string(), at));
     }
     Ok(json!({"panel": panel, "floating": floating_panels(app)}))

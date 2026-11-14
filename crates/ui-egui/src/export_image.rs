@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::DesignApp;
+use crate::app::file_dialogs::Bound;
 use crate::theme::Tokens;
 
 /// The window's own commands.
@@ -273,14 +274,10 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
     app.ui.export_image = s;
     app.ui.export_image_page = page;
     if export {
-        match export_now(app) {
-            Ok(Some(path)) => {
-                app.ui.export_image_open = false;
-                app.status(format!("Exported {path}"));
-            }
-            // Cancelled in the save dialog: the window stays.
-            Ok(None) => {}
-            Err(e) => app.status(e),
+        // The window closes; the save dialog asks where, and the file is written once it answers.
+        app.ui.export_image_open = false;
+        if let Err(e) = export_now(app) {
+            app.status(e);
         }
     }
     if !open || cancel {
@@ -288,18 +285,20 @@ pub fn window(app: &mut DesignApp, ctx: &egui::Context) {
     }
 }
 
-/// Ask where to save and write the file; `None` when the save dialog was cancelled.
-fn export_now(app: &mut DesignApp) -> Result<Option<String>, String> {
+/// Ask where to save; once the save dialog answers, export and write the file.
+fn export_now(app: &mut DesignApp) -> Result<Value, String> {
     let page = app.ui.export_image_page;
     let p = app.ui.export_image.params(page);
     let title = app.session.active().map(|d| d.doc.title.clone()).unwrap_or_default();
     let ext = if app.ui.export_image.tiff { "tif" } else { "jpg" };
-    let Some(path) = app.pick_save(&format!("{title}-p{}.{ext}", page + 1)) else { return Ok(None) };
-    let r = app.run("file.exportImage", p)?;
-    let bytes = designcraft_engine::cmd::base64_decode(r["base64"].as_str().unwrap_or_default());
-    let write = app.services.write.as_mut().ok_or("no writer")?;
-    write(&path, &bytes)?;
-    Ok(Some(path))
+    app.ask_save(&format!("{title}-p{}.{ext}", page + 1), Bound::Document, move |app, path| {
+        let r = app.run("file.exportImage", p)?;
+        let bytes = designcraft_engine::cmd::base64_decode(r["base64"].as_str().unwrap_or_default());
+        let write = app.services.write.as_mut().ok_or("no writer")?;
+        write(&path, &bytes)?;
+        app.status(format!("Exported {path}"));
+        Ok(json!({"path": path}))
+    })
 }
 
 fn size_label(by: SizeBy) -> &'static str {
@@ -373,12 +372,13 @@ mod tests {
             sink.borrow_mut().push((path.to_string(), bytes.to_vec()));
             Ok(())
         }));
-        app.services.pick_save = Some(Box::new(|name: &str| Some(format!("/out/{name}"))));
+        app.answer_dialogs(crate::app::file_dialogs::testing::answer_with(Some("/out/Untitled-p1.tif".into())));
         app.ui.export_image = ExportImageSettings { tiff: true, ppi: 72.0, ..Default::default() };
-        let path = export_now(&mut app).unwrap().unwrap();
-        assert!(path.ends_with("-p1.tif"), "{path}");
+        export_now(&mut app).unwrap();
+        app.settle_dialogs();
         let w = written.borrow();
         assert_eq!(w.len(), 1);
+        assert!(w[0].0.ends_with("-p1.tif"), "{}", w[0].0);
         assert!(w[0].1.starts_with(b"II*\0") || w[0].1.starts_with(b"MM\0*"));
     }
 }
