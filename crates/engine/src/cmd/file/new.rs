@@ -27,12 +27,23 @@ fn new_document_settings(s: &Session, p: &Value) -> Result<NewDocument> {
 /// A document as `file.new` makes it. Its Basic Paragraph doesn't hyphenate capitalized words, a
 /// paragraph's last word or across a column. Opened and imported files keep their own values,
 /// which is why `ParaProps` keeps the IDML defaults (on).
-fn new_document(nd: &NewDocument) -> Document {
+fn new_document(nd: &NewDocument, text: &crate::DefaultText) -> Document {
     let mut d = Document::new(nd);
+    // The default text applies only with its font installed: a document never starts out with a
+    // missing font.
+    let db = designcraft_fonts::FontDb::global().scoped(d.font_scope);
+    let installed = db.has_family(&text.family) && db.has_style(&text.family, &text.style);
+    let sizes = text.size.is_finite() && text.size > 0.0 && text.leading.is_finite() && text.leading > 0.0;
     if let Some(st) = Arc::make_mut(&mut d.styles).para_mut(designcraft_doc::BASIC_PARAGRAPH) {
         st.para.hyph_capitalized = Some(false);
         st.para.hyph_last_word = Some(false);
         st.para.hyph_across_column = Some(false);
+        if installed && sizes {
+            st.chars.font_family = Some(text.family.clone());
+            st.chars.font_style = Some(text.style.clone());
+            st.chars.size = Some(text.size);
+            st.chars.leading = Some(designcraft_doc::Leading::Points(text.leading));
+        }
     }
     d
 }
@@ -41,7 +52,7 @@ pub(super) fn file_new(s: &mut Session, p: &Value) -> Result<Value> {
     let mut nd = new_document_settings(s, p)?;
     s.untitled += 1;
     nd.title = str_param(p, "title").map(str::to_string).unwrap_or_else(|| format!("Untitled-{}", s.untitled));
-    let mut d = new_document(&nd);
+    let mut d = new_document(&nd, &s.prefs.default_text);
     s.prefs.default_units.apply(&mut d.settings, p.get("preset").is_some_and(|v| !v.is_null()));
     let i = s.add_document(DocState::new(d, None));
     Ok(json!({"index": i}))
@@ -72,7 +83,7 @@ impl Session {
             self.untitled += 1;
         }
         nd.title = str_param(p, "title").map(str::to_string).unwrap_or_else(|| self.next_untitled_title());
-        let mut d = new_document(&nd);
+        let mut d = new_document(&nd, &self.prefs.default_text);
         self.prefs.default_units.apply(&mut d.settings, p.get("preset").is_some_and(|v| !v.is_null()));
         let st = DocState::new(d, None);
         let uid = st.uid;
@@ -354,5 +365,36 @@ mod hyphenation_default_tests {
         let b64 = super::base64_encode(&designcraft_idml::export_idml(&d));
         s.execute("file.openIdml", &json!({"base64": b64, "name": "in.idml"})).unwrap();
         assert_eq!(hyph_flags(&s.doc().unwrap().doc), (true, true, true));
+    }
+}
+
+#[cfg(test)]
+mod default_text_tests {
+    use designcraft_doc::BASIC_PARAGRAPH;
+    use serde_json::json;
+
+    use crate::{DefaultText, Session};
+
+    fn basic(s: &Session) -> designcraft_doc::CharAttrs {
+        s.doc().unwrap().doc.styles.para(BASIC_PARAGRAPH).unwrap().chars.clone()
+    }
+
+    #[test]
+    fn new_documents_start_with_the_default_text_when_its_font_is_installed() {
+        let mut s = Session::new();
+        s.prefs.default_text = DefaultText { family: designcraft_fonts::DEFAULT_FAMILY.into(), style: "Bold".into(), size: 11.0, leading: 14.0 };
+        s.execute("file.new", &json!({})).unwrap();
+        let c = basic(&s);
+        assert_eq!((c.font_family.as_deref(), c.font_style.as_deref()), (Some(designcraft_fonts::DEFAULT_FAMILY), Some("Bold")));
+        assert_eq!((c.size, c.leading), (Some(11.0), Some(designcraft_doc::Leading::Points(14.0))));
+    }
+
+    #[test]
+    fn a_default_font_that_is_not_installed_leaves_the_factory_text() {
+        let mut s = Session::new();
+        s.prefs.default_text = DefaultText { family: "Not Installed Sans".into(), ..DefaultText::default() };
+        s.execute("file.new", &json!({})).unwrap();
+        let c = basic(&s);
+        assert_eq!((c.font_family, c.size), (None, None));
     }
 }

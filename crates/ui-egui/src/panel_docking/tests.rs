@@ -1321,3 +1321,26 @@ fn the_pages_column_drags_very_narrow() {
     let narrow = after.center().x - start.min.x;
     assert!(narrow <= 40.0, "the Pages column stops {narrow} pt wide (divider {before:?} → {after:?})");
 }
+
+/// Emma: the right-hand panel column narrows as far as she likes, not just to 220 pt.
+#[test]
+fn the_right_panel_column_drags_very_narrow() {
+    crate::closet::use_starting_sort();
+    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_ui_state(
+        |ui, app: &mut DesignApp| {
+            app.logic(ui.ctx());
+            app.ui(ui);
+        },
+        app(),
+    );
+    h.run_steps(5);
+    let layers = craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Column("layers".to_string()));
+    let right = |h: &Harness<'static, DesignApp>| {
+        hits(h).into_iter().find_map(|(hit, rect)| (hit == layers).then_some(rect)).expect("the Layers column's divider")
+    };
+    let before = right(&h);
+    drag(&mut h, before.center(), egui::pos2(1280.0, before.center().y));
+    h.run_steps(3);
+    let moved = right(&h).center().x - before.center().x;
+    assert!(moved >= 180.0, "the right column gives up only {moved} pt (from {before:?})");
+}

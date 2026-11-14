@@ -67,6 +67,8 @@ const COLUMN_WIDTH: f32 = 260.0;
 /// ([`PAGES_MIN_WIDTH`]: one thumbnail sliver).
 const PAGES_COLUMN_WIDTH: f32 = 120.0;
 const PAGES_MIN_WIDTH: f32 = 24.0;
+/// The narrowest any other docked panel goes.
+const PANEL_MIN_WIDTH: f32 = 40.0;
 /// Width of an iconic column of bare icons, and of one whose groups show their names.
 const ICON_WIDTH: f32 = 37.0;
 const NAMED_ICON_WIDTH: f32 = 150.0;
@@ -118,7 +120,7 @@ impl Placed {
 const ICON_GROUPS: &[&[&str]] = &[
     &["stroke", "color", "swatches", "gradient"],
     &["effects"],
-    // Marian DesignCraft: the text panels in Emma's order.
+    // Marian DesignCraft: the text panels in Emma's order (in the Layers column when sorted).
     &["character", "paragraph", "story", "glyphs", "typography"],
     &["paragraphStyles", "characterStyles"],
     &["objectStyles"],
@@ -136,6 +138,9 @@ const ICON_GROUPS: &[&[&str]] = &[
     &["articles", "tags"],
     &["book", "dataMerge", "scripts"],
 ];
+
+/// Marian DesignCraft: the type panels' groups, docked under Layers.
+const TEXT_GROUPS: &[&[&str]] = &[&["character", "paragraph", "story", "glyphs", "typography"], &["paragraphStyles", "characterStyles"]];
 
 /// A workspace's iconic column of the panels not placed yet: its named `icon_groups`
 /// (Essentials Classic, Typography), or [`ICON_GROUPS`] followed by any other dock panel as a
@@ -200,6 +205,15 @@ pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
         let mut groups = Vec::new();
         if !panels.is_empty() {
             groups.push(Group::new(panels, active));
+        }
+        // Marian DesignCraft: the type panels sit in this column under Layers, as tabs that open
+        // in place, instead of flying out of the iconic column over the pasteboard.
+        if crate::closet::sorted() {
+            for family in TEXT_GROUPS {
+                if let Some(group) = placed.group(family, 0) {
+                    groups.push(Group { minimized: true, ..group });
+                }
+            }
         }
         // The panel a workspace opens (Printing and Proofing: Swatches) goes below at a fixed
         // height, so Properties keeps most of the column.
@@ -1343,7 +1357,8 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
         let min = match id.as_str() {
             CANVAS => egui::vec2(200.0, 120.0),
             "pages" => egui::vec2(PAGES_MIN_WIDTH, 80.0),
-            _ => egui::vec2(220.0, 80.0),
+            // Marian DesignCraft: the panel columns narrow as far as Emma likes (the content clips).
+            _ => egui::vec2(PANEL_MIN_WIDTH, 80.0),
         };
         craft_ui::docking::PanelLimits { min, ..Default::default() }
     }

@@ -395,8 +395,11 @@ pub fn show(app: &mut DesignApp, ui: &mut Ui) {
     // `doc.layers` runs top (frontmost) to bottom, as the panel lists them.
     for (li, l) in doc.layers.iter().enumerate() {
         let open_id = egui::Id::unique(("layer_open", l.id.0));
-        let mut open: bool = ui.data(|d| d.get_temp(open_id)).unwrap_or(l.id == active);
-        if reveal && sel_layers.contains(&l.id) && !open {
+        // Marian DesignCraft: layers start closed and a selection doesn't open them; only their
+        // disclosure arrow does.
+        let marian = crate::closet::sorted();
+        let mut open: bool = ui.data(|d| d.get_temp(open_id)).unwrap_or(l.id == active && !marian);
+        if reveal && !marian && sel_layers.contains(&l.id) && !open {
             open = true;
             ui.data_mut(|d| d.insert_temp(open_id, true));
         }
@@ -786,6 +789,26 @@ mod tests {
         h.ctx.data_mut(|d| d.insert_temp(egui::Id::unique(("layer_open", first.0)), false));
         h.run_steps(2);
         assert!(!open(&h));
+    }
+
+    /// Marian DesignCraft: every layer starts closed, the active one too, and selecting an object
+    /// leaves its layer closed; only the disclosure arrow opens it.
+    #[test]
+    fn marian_layers_start_closed_and_stay_closed_on_selection() {
+        use egui_kittest::Harness;
+        crate::closet::use_starting_sort();
+        let mut app = DesignApp::new(designcraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({})).unwrap();
+        let id = app.run("frame.create", json!({"rect": [72, 72, 200, 200]})).unwrap()["id"].as_u64().unwrap();
+        let layer = app.session.active().unwrap().doc.item(ItemId(id)).unwrap().layer;
+        app.run("selection.set", json!({"ids": []})).unwrap();
+        let mut h = Harness::builder().with_size(egui::vec2(260.0, 400.0)).build_ui_state(|ui, app: &mut DesignApp| show(app, ui), app);
+        h.run_steps(2);
+        let rows = |h: &Harness<'_, DesignApp>| h.ctx.data(|d| d.get_temp::<bool>(egui::Id::unique(("layer_open", layer.0)))).unwrap_or(false);
+        assert!(!rows(&h), "the active layer starts closed");
+        h.state_mut().run("selection.set", json!({"ids": [id]})).unwrap();
+        h.run_steps(2);
+        assert!(!rows(&h), "selecting its object leaves it closed");
     }
 
     /// As InDesign's: a slow double-click on an object's row renames it; a quick one doesn't.

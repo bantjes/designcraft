@@ -261,6 +261,28 @@ pub struct Prefs {
     /// Preferences › Units & Increments set with no document open: what new documents start
     /// with, as InDesign's application defaults. A document keeps its own once made.
     pub default_units: DefaultUnits,
+    /// Marian DesignCraft: the text new documents start with (their Basic Paragraph), when that
+    /// font is installed.
+    pub default_text: DefaultText,
+}
+
+/// The font, size and leading of a new document's Basic Paragraph.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DefaultText {
+    pub family: String,
+    pub style: String,
+    /// Points.
+    pub size: f64,
+    /// Points.
+    pub leading: f64,
+}
+
+impl Default for DefaultText {
+    /// Emma's: Surveyor Text Book, 11 on 14.
+    fn default() -> Self {
+        DefaultText { family: "Surveyor Text".into(), style: "Book".into(), size: 11.0, leading: 14.0 }
+    }
 }
 
 /// Units & Increments for new documents (Preferences with no document open), in the keys
@@ -389,6 +411,7 @@ impl Default for Prefs {
             recent_files: Vec::new(),
             recent_files_max: 20,
             default_units: DefaultUnits::default(),
+            default_text: DefaultText::default(),
         }
     }
 }
