@@ -34,6 +34,7 @@ impl UiState {
             }
         }
         let mut ui: UiState = serde_json::from_value(saved)?;
+        marian_setup(&mut ui);
         clear_stale_open_panels(&mut ui);
         intact &= migrate(&mut ui.docking, &mut ui.floating, &ui.docking_hidden, ui.dock_expanded, ui.icon_groups.as_deref());
         for workspace in &mut ui.custom_workspaces {
@@ -124,6 +125,21 @@ fn clear_stale_open_panels(ui: &mut UiState) {
     if ui.open_panel.as_deref() != own {
         ui.open_panel = None;
     }
+}
+
+/// Brings preferences saved before the latest Marian set-up up to it, once.
+fn marian_setup(ui: &mut UiState) {
+    if !crate::closet::sorted() || ui.marian_setup >= crate::state::MARIAN_SETUP {
+        return;
+    }
+    ui.control_bar = true;
+    ui.workspace = "Typography".into();
+    ui.icon_groups = None;
+    ui.dock_expanded = true;
+    ui.docking = None;
+    ui.floating.clear();
+    ui.docking_hidden = Default::default();
+    ui.marian_setup = crate::state::MARIAN_SETUP;
 }
 
 /// Drop docking data this version cannot read. True when nothing was dropped.

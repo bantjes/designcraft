@@ -321,3 +321,14 @@ fn hidden_panels_is_not_persisted_across_restarts() {
     let saved = serde_json::to_value(&ui).unwrap();
     assert!(saved.get("hiddenPanels").is_none());
 }
+
+#[test]
+fn marian_preferences_from_before_the_setup_open_in_typography_once() {
+    crate::closet::use_starting_sort();
+    let ui = load(json!({"workspace": "Essentials", "controlBar": false, "floating": [["glyphs", [100.0, 120.0]]]}));
+    assert_eq!((ui.workspace.as_str(), ui.control_bar, ui.marian_setup), ("Typography", true, crate::state::MARIAN_SETUP));
+    assert!(ui.floating.is_empty() && ui.docking.is_none(), "the panels go to Marian's own layout");
+    let ui = load(json!({"workspace": "Book", "controlBar": false, "marianSetup": crate::state::MARIAN_SETUP}));
+    assert_eq!((ui.workspace.as_str(), ui.control_bar), ("Book", false), "her own later choices stay");
+    assert!(UiState::default().control_bar, "a first start opens with the Control panel too");
+}

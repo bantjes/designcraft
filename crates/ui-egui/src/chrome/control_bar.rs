@@ -213,6 +213,13 @@ fn control_text(app: &mut DesignApp, ui: &mut egui::Ui) {
     let attrs = panels::text_attrs(app);
     let chars = attrs.as_ref().map(|a| a["chars"].clone()).unwrap_or_default();
     let para = attrs.as_ref().map(|a| a["para"].clone()).unwrap_or_default();
+    // Marian: the Character and the Paragraph controls side by side in one bar, no switching.
+    if crate::closet::sorted() {
+        control_character(app, ui, &attrs, &chars, &para, &tr);
+        vsep(ui);
+        control_paragraph(app, ui, &attrs, &para, &tr);
+        return;
+    }
     let mode_id = egui::Id::unique(PARA_MODE);
     let para_mode = ui.data(|d| d.get_temp::<bool>(mode_id)).unwrap_or(false);
     ui.vertical(|ui| {

@@ -79,6 +79,11 @@ pub enum ScreenMode {
     Presentation,
 }
 
+/// The latest Marian set-up (see [`UiState::marian_setup`]). 1 (2026-11-14): open in Typography
+/// with the Control panel showing, and the panels in Marian's own default layout (Character,
+/// Paragraph and the other type panels under Layers).
+pub const MARIAN_SETUP: u32 = 1;
+
 /// A saved workspace: which bars show and where the panels are.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -330,6 +335,11 @@ pub struct UiState {
     pub icon_groups: Option<Vec<Vec<String>>>,
     pub units: Unit,
     pub workspace: String,
+    /// Which Marian set-up changes these preferences have had ([`MARIAN_SETUP`]): saved
+    /// preferences from before one are brought up to it once, when they load. Missing (older
+    /// files) reads as 0.
+    #[serde(default)]
+    pub marian_setup: u32,
     /// Window › Workspace › New Workspace: saved panel arrangements.
     pub custom_workspaces: Vec<SavedWorkspace>,
     /// File › New › Document › Recent: the settings of the last documents made, newest first.
@@ -465,7 +475,8 @@ impl Default for UiState {
             overprint_preview: false,
             shortcuts: Default::default(),
             shortcut_sets: Default::default(),
-            control_bar: false,
+            // Marian DesignCraft starts in Typography, with the Control panel across the top.
+            control_bar: crate::closet::sorted(),
             tools_double_column: false,
             dock_tab: "properties".into(),
             open_panel: None,
@@ -481,7 +492,8 @@ impl Default for UiState {
             dock_expanded: true,
             icon_groups: None,
             units: Unit::Picas,
-            workspace: "Essentials".into(),
+            workspace: if crate::closet::sorted() { "Typography" } else { "Essentials" }.into(),
+            marian_setup: if crate::closet::sorted() { MARIAN_SETUP } else { 0 },
             custom_workspaces: Vec::new(),
             recent_new_documents: Vec::new(),
             last_save_folder: None,

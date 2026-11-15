@@ -1192,7 +1192,8 @@ fn run_ui_part5(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
             // Properties stack.
             let groups = match name {
                 "Essentials Classic" => Some(CLASSIC_GROUPS),
-                "Typography" => Some(TYPOGRAPHY_GROUPS),
+                // Marian keeps its own panel layout in Typography (type panels under Layers).
+                "Typography" if !crate::closet::sorted() => Some(TYPOGRAPHY_GROUPS),
                 _ => None,
             };
             app.ui.icon_groups = groups.map(|groups| groups.iter().map(|g| g.iter().map(ToString::to_string).collect()).collect());
