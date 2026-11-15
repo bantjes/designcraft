@@ -167,6 +167,19 @@ fn rotate(ink: &mut Ink, o: Pos2) {
     }
 }
 
+/// An eyedropper, its tip at `o`, slanting up to the right: a glass tube, a collar and a rubber
+/// bulb. `loaded` fills the tube (it holds what it picked up).
+fn eyedropper(ink: &mut Ink, o: Pos2, loaded: bool) {
+    let d = vec2(1.0, -1.0) / std::f32::consts::SQRT_2;
+    let n = vec2(1.0, 1.0) / std::f32::consts::SQRT_2;
+    let along = |t: f32, w: f32| o + d * t + n * w;
+    ink.poly(vec![along(0.0, 0.7), along(0.0, -0.7), along(10.0, -1.8), along(10.0, 1.8)], if loaded { INK } else { HALO });
+    ink.poly(vec![along(10.0, 3.2), along(10.0, -3.2), along(12.5, -3.2), along(12.5, 3.2)], INK);
+    ink.poly(vec![along(12.5, 2.2), along(12.5, -2.2), along(17.5, -2.2), along(17.5, 2.2)], INK);
+    ink.halo(Shape::circle_stroke(along(18.0, 0.0), 2.4, Stroke::new(3.0, HALO)));
+    ink.add(Shape::circle_filled(along(18.0, 0.0), 2.4, INK));
+}
+
 /// The shapes of cursor `c` with its hotspot at `p`, in points; `None` for system cursors.
 fn glyph(c: Cursor, p: Pos2) -> Option<Vec<Shape>> {
     let mut ink = Ink::default();
@@ -180,6 +193,8 @@ fn glyph(c: Cursor, p: Pos2) -> Option<Vec<Shape>> {
         Cursor::PenConvert => pen(&mut ink, p, Badge::Convert),
         Cursor::PenContinue => pen(&mut ink, p, Badge::Continue),
         Cursor::Rotate => rotate(&mut ink, p),
+        Cursor::Eyedropper => eyedropper(&mut ink, p, false),
+        Cursor::EyedropperLoaded => eyedropper(&mut ink, p, true),
         _ => return None,
     }
     Some(ink.into_shapes())
@@ -304,7 +319,7 @@ pub fn system(c: Cursor) -> egui::CursorIcon {
         Cursor::HandGrab => C::Grabbing,
         Cursor::ZoomIn => C::ZoomIn,
         Cursor::ZoomOut => C::ZoomOut,
-        Cursor::Eyedropper => C::Crosshair,
+        Cursor::Eyedropper | Cursor::EyedropperLoaded => C::Crosshair,
         Cursor::LoadedText | Cursor::LoadedGraphic => C::Copy,
         Cursor::ThreadLink => C::Alias,
         Cursor::Unthread => C::NoDrop,
@@ -416,7 +431,7 @@ mod tests {
     }
 
     /// Every cursor with a glyph.
-    const GLYPHS: [Cursor; 9] = [
+    const GLYPHS: [Cursor; 11] = [
         Cursor::Arrow,
         Cursor::ArrowHollow,
         Cursor::Pen,
@@ -426,6 +441,8 @@ mod tests {
         Cursor::PenConvert,
         Cursor::PenContinue,
         Cursor::Rotate,
+        Cursor::Eyedropper,
+        Cursor::EyedropperLoaded,
     ];
 
     fn alpha(img: &CustomCursorImage, x: usize, y: usize) -> u8 {

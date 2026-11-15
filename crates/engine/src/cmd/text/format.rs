@@ -13,8 +13,19 @@ pub(super) fn pick_up_format(s: &mut Session, p: &Value) -> Result<Value> {
     let frame = id_param(p, "frame").ok_or_else(|| bad(ID, "missing frame"))?;
     let pt = point_param(p, "point").ok_or_else(|| bad(ID, "missing point"))?;
     let (sid, b, cell) = hit_byte_with(s, frame, pt, compose::hit_char).ok_or_else(|| bad(ID, "not a text frame"))?;
+    let sel = s.doc()?.selection.text.ok_or_else(|| bad(ID, "select the text to format"))?;
+    let (a, e) = (sel.anchor.min(sel.focus), sel.anchor.max(sel.focus));
+    copy_format(s, (sid, b, cell), (sel.story, sel.cell, a, e))
+}
+
+/// The character and paragraph formatting at byte `b` of story `sid` (cell `cell`) copied onto
+/// bytes `a..e` of `to`'s story: the characters (when the range isn't empty) and their paragraphs.
+fn copy_format(
+    s: &mut Session,
+    (sid, b, cell): (StoryId, usize, Option<CellAddr>),
+    (to, to_cell, a, e): (StoryId, Option<CellAddr>, usize, usize),
+) -> Result<Value> {
     let st = s.doc()?;
-    let sel = st.selection.text.ok_or_else(|| bad(ID, "select the text to format"))?;
     let src = st.doc.text_story(sid, cell).ok_or(designcraft_doc::DocError::NoStory(sid))?;
     let b = floor_char_boundary(&src.text, b);
     // The character under the pointer (at the end of a line, the one before it).
@@ -22,10 +33,9 @@ pub(super) fn pick_up_format(s: &mut Session, p: &Value) -> Result<Value> {
     let at = floor_char_boundary(&src.text, at);
     let chars = src.char_format_at(at).clone();
     let para = src.paras.get(src.para_at(at)).cloned().ok_or(designcraft_doc::DocError::NoStory(sid))?;
-    let (a, e) = (sel.anchor.min(sel.focus), sel.anchor.max(sel.focus));
     s.typing_format = None;
     s.edit(|d, _| {
-        let story = d.text_story_mut(sel.story, sel.cell).ok_or(designcraft_doc::DocError::NoStory(sel.story))?;
+        let story = d.text_story_mut(to, to_cell).ok_or(designcraft_doc::DocError::NoStory(to))?;
         if e > a {
             story.format_chars(a..e, |f| *f = chars.clone());
         }
@@ -35,6 +45,33 @@ pub(super) fn pick_up_format(s: &mut Session, p: &Value) -> Result<Value> {
         });
         Ok(json!({"style": chars.style, "paragraphStyle": para.style}))
     })
+}
+
+/// The loaded Eyedropper: the formatting of the text under `point` in `frame` goes to the text
+/// under `toPoint` in `toFrame`: from there to `toEnd` when the Eyedropper was dragged across text,
+/// else that whole paragraph. A locked frame or layer is left alone.
+pub(super) fn apply_format_at(s: &mut Session, p: &Value) -> Result<Value> {
+    const ID: &str = "type.applyFormatAt";
+    let frame = id_param(p, "frame").ok_or_else(|| bad(ID, "missing frame"))?;
+    let pt = point_param(p, "point").ok_or_else(|| bad(ID, "missing point"))?;
+    let to_frame = id_param(p, "toFrame").ok_or_else(|| bad(ID, "missing toFrame"))?;
+    let to_pt = point_param(p, "toPoint").ok_or_else(|| bad(ID, "missing toPoint"))?;
+    let d = &s.doc()?.doc;
+    let it = d.item(to_frame).ok_or(designcraft_doc::DocError::NoItem(to_frame))?;
+    if it.locked || d.layer(it.layer).is_some_and(|l| l.locked) {
+        return Err(bad(ID, "that frame is locked"));
+    }
+    let source = hit_byte_with(s, frame, pt, compose::hit_char).ok_or_else(|| bad(ID, "not a text frame"))?;
+    let (to, start, to_cell) = hit_byte_with(s, to_frame, to_pt, compose::hit).ok_or_else(|| bad(ID, "not a text frame"))?;
+    let end = point_param(p, "toEnd")
+        .and_then(|end| hit_byte_with(s, to_frame, end, compose::hit))
+        .filter(|(sid, _, cell)| *sid == to && *cell == to_cell)
+        .map(|(_, b, _)| b);
+    let (a, e) = match end {
+        Some(end) if end != start => (start.min(end), start.max(end)),
+        _ => super::caret::unit_at(s, to, to_cell, start, "paragraph", ID)?,
+    };
+    copy_format(s, source, (to, to_cell, a, e))
 }
 
 /// Where a formatting command applies: a story (or a table cell's story) and a byte range.
@@ -1192,6 +1229,33 @@ mod pick_up_format_tests {
         let rect = s.execute("frame.create", &json!({"rect": [500, 500, 520, 520]})).unwrap()["id"].as_u64().unwrap();
         assert!(s.execute("type.pickUpFormat", &json!({"frame": rect, "point": [510, 510]})).is_err());
         let _ = ItemId(rect);
+    }
+
+    /// Emma: the loaded Eyedropper (nothing selected) puts a heading's formatting on the paragraph
+    /// she clicks, or on the text she drags across; a locked layer is left alone.
+    #[test]
+    fn the_loaded_eyedropper_formats_the_clicked_paragraph_or_dragged_text() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({})).unwrap();
+        let head = s.execute("frame.create", &json!({"rect": [36, 36, 400, 100], "content": "text", "text": "Heading"})).unwrap();
+        s.execute("text.select", &json!({"story": head["story"], "anchor": 0, "focus": 7})).unwrap();
+        s.execute("type.char", &json!({"attrs": {"size": 18}})).unwrap();
+        s.execute("type.para", &json!({"attrs": {"align": "center"}})).unwrap();
+        let body = s.execute("frame.create", &json!({"rect": [36, 200, 400, 300], "content": "text", "text": "Body copy here.\nSecond."})).unwrap();
+        s.execute("selection.set", &json!({"ids": []})).unwrap();
+        s.execute("type.applyFormatAt", &json!({"frame": head["id"], "point": [60, 50], "toFrame": body["id"], "toPoint": [40, 210]})).unwrap();
+        let attrs = |s: &mut Session, a: usize, f: usize| {
+            s.execute("text.select", &json!({"story": body["story"], "anchor": a, "focus": f})).unwrap();
+            s.execute("type.selectionAttrs", &json!({})).unwrap()
+        };
+        let first = attrs(&mut s, 0, 15);
+        assert_eq!((&first["chars"]["size"], &first["para"]["align"]), (&json!(18.0), &json!("center")), "{first}");
+        assert_eq!(attrs(&mut s, 17, 20)["chars"]["size"], json!(12.0), "the next paragraph keeps its own");
+        let lid = s.doc().unwrap().doc.default_layer();
+        s.execute("layer.set", &json!({"id": lid.0, "locked": true})).unwrap();
+        assert!(
+            s.execute("type.applyFormatAt", &json!({"frame": head["id"], "point": [60, 50], "toFrame": body["id"], "toPoint": [40, 250]})).is_err()
+        );
     }
 }
 

@@ -68,7 +68,7 @@ pub(super) fn select_at(s: &mut Session, p: &Value, unit: &str) -> Result<Value>
 
 /// The `unit` (word, line, paragraph or story) around byte `b` of story `sid` (a cell's story
 /// with `cell`), as the multiple clicks select it.
-fn unit_at(s: &Session, sid: StoryId, cell: Option<CellAddr>, b: usize, unit: &str, cmd: &str) -> Result<(usize, usize)> {
+pub(super) fn unit_at(s: &Session, sid: StoryId, cell: Option<CellAddr>, b: usize, unit: &str, cmd: &str) -> Result<(usize, usize)> {
     let st = s.doc()?;
     let story = st.doc.text_story(sid, cell).ok_or(designcraft_doc::DocError::NoStory(sid))?;
     let text = story.text.as_str();

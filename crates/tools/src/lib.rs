@@ -488,6 +488,8 @@ pub enum Cursor {
     ZoomIn,
     ZoomOut,
     Eyedropper,
+    /// The Eyedropper holding what it picked up, ready to put it on what is clicked next.
+    EyedropperLoaded,
     LoadedText,
     /// Loaded text over a frame a click threads to.
     ThreadLink,
@@ -562,7 +564,7 @@ pub fn create(id: &str) -> Box<dyn Tool> {
         "rotate" => Box::new(xform::XformTool::new("rotate")),
         "scale" => Box::new(xform::XformTool::new("scale")),
         "shear" => Box::new(xform::XformTool::new("shear")),
-        "eyedropper" => Box::new(xform::EyedropperTool),
+        "eyedropper" => Box::new(xform::EyedropperTool::default()),
         "colorTheme" => Box::new(xform::ColorThemeTool),
         "hand" => Box::new(nav::HandTool::default()),
         "placeGun" => Box::new(nav::PlaceGun::default()),

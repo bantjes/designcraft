@@ -28,7 +28,7 @@ pub(crate) use format::{
     justification_order_error, justification_rows_changed, justification_rows_named, rename_typing_swatch, validate_char_fill,
     validate_justification_order, validate_para_values,
 };
-use format::{break_link, kern_pair, kern_step, link_style, para_toggle, pick_up_format, step_size, swap_fill_stroke};
+use format::{apply_format_at, break_link, kern_pair, kern_step, link_style, para_toggle, pick_up_format, step_size, swap_fill_stroke};
 use opentype::{open_type, open_type_features, set_features};
 pub(crate) use story::set_story_direction;
 use story::{selection_attrs, story_direction, story_options};
@@ -66,6 +66,15 @@ pub fn specs() -> Vec<CommandSpec> {
             "{frame, point, unit: word|line|paragraph|story} — what a double, triple, quadruple or quintuple click selects: the word (or run of spaces) under the point, its line, its paragraph with the paragraph return, or the whole story",
             has_doc,
             |s, p| select_at(s, p, str_param(p, "unit").unwrap_or("word"))
+        ),
+        cmd!(
+            "type.applyFormatAt",
+            "Apply Text Attributes (Loaded Eyedropper)",
+            [],
+            None,
+            "{frame, point, toFrame, toPoint, toEnd?} — the loaded Eyedropper: the character and paragraph formatting of the text under `point` in `frame` go to the text under `toPoint` in `toFrame` (to `toEnd` when dragged across text, else that whole paragraph)",
+            has_doc,
+            apply_format_at
         ),
         cmd!(
             "type.pickUpFormat",

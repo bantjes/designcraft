@@ -2616,3 +2616,41 @@ fn place_gun_grid_preview_matches_the_release_on_a_rotated_spread() {
     let (Overlay::Marquee(first), Overlay::Marquee(second)) = (&shown[0], &shown[1]) else { panic!("{shown:?}") };
     assert!((first.x0 - second.x0).abs() < 1e-6, "{shown:?}");
 }
+
+/// Emma: with nothing selected the Eyedropper "only shows a cross and does nothing". Now the first
+/// click loads it, and each later click puts what it holds on what it clicks.
+#[test]
+fn the_eyedropper_with_nothing_selected_loads_then_applies_to_each_click() {
+    let mut d = Document::new(&NewDocument::default());
+    let lid = d.default_layer();
+    let source = add_rect(&mut d, Rect::new(100.0, 100.0, 150.0, 150.0));
+    let target = add_rect(&mut d, Rect::new(300.0, 100.0, 350.0, 150.0));
+    let (head, _) = d.add_text_frame(SpreadRef::Doc(0), Rect::new(100.0, 300.0, 300.0, 340.0), lid, "Header", ParaFormat::default()).unwrap();
+    let (body_frame, _) = d.add_text_frame(SpreadRef::Doc(0), Rect::new(100.0, 400.0, 300.0, 500.0), lid, "Body", ParaFormat::default()).unwrap();
+    let none = Selection::default();
+    let (c, l) = (Cache::new(), CanvasLayout::new(&d, false));
+    let off = l.xf(SpreadRef::Doc(0)).translation();
+    let cx = ctx(&d, &none, &c, &l);
+    let mut t = create("eyedropper");
+    let down = |x: f64, y: f64| PointerEvent::new(PointerKind::Down, x + off.x, y + off.y);
+    assert_eq!(t.cursor(&cx, Point::new(0.0, 0.0), Mods::default()), Cursor::Eyedropper);
+    assert_eq!(t.pointer(&cx, &down(120.0, 120.0)), vec![Action::Handled], "the first click loads it");
+    assert_eq!(t.cursor(&cx, Point::new(0.0, 0.0), Mods::default()), Cursor::EyedropperLoaded);
+    assert_eq!(
+        t.pointer(&cx, &down(320.0, 120.0)),
+        vec![Action::Exec("object.matchAttributes".into(), serde_json::json!({"from": source.0, "ids": [target.0]}))]
+    );
+    // Clicking empty canvas lets go; loading from text puts its formatting on clicked text.
+    assert_eq!(t.pointer(&cx, &down(700.0, 700.0)), vec![Action::Handled]);
+    assert_eq!(t.cursor(&cx, Point::new(0.0, 0.0), Mods::default()), Cursor::Eyedropper);
+    t.pointer(&cx, &down(150.0, 320.0));
+    assert_eq!(t.pointer(&cx, &down(150.0, 420.0)), vec![Action::Handled]);
+    let up = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 150.0 + off.x, 420.0 + off.y));
+    assert_eq!(
+        up,
+        vec![Action::Exec(
+            "type.applyFormatAt".into(),
+            serde_json::json!({"frame": head.0, "point": [150.0, 320.0], "toFrame": body_frame.0, "toPoint": [150.0, 420.0]})
+        )]
+    );
+}

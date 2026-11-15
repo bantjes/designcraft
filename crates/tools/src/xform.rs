@@ -289,8 +289,24 @@ fn image_under(cx: &ToolContext, p: Point) -> Option<(SpreadRef, Point)> {
     image.then_some((sr, at))
 }
 
+/// With nothing selected, the first click loads the Eyedropper with what it clicked (its colours
+/// and, for text, the formatting under the pointer); each later click puts that on what it clicks
+/// (a drag across text formats the text dragged across, a click the whole paragraph). A click on
+/// empty canvas empties it; Option-click loads it again.
 #[derive(Default)]
-pub struct EyedropperTool;
+pub struct EyedropperTool {
+    loaded: Option<Loaded>,
+    /// A press on text while loaded with text: the frame and spread point, applied on release.
+    press: Option<(designcraft_doc::ItemId, Point)>,
+}
+
+#[derive(Clone, Copy)]
+struct Loaded {
+    id: designcraft_doc::ItemId,
+    /// Where it was clicked, in spread coordinates.
+    at: Point,
+    text: bool,
+}
 
 /// The palette tool only requests a preview. Adding the swatches is a separate command.
 pub struct ColorThemeTool;
@@ -319,8 +335,37 @@ impl Tool for EyedropperTool {
         "eyedropper"
     }
     fn pointer(&mut self, cx: &ToolContext, ev: &PointerEvent) -> Vec<Action> {
+        if ev.kind == PointerKind::Up
+            && let (Some((to, start)), Some(src)) = (self.press.take(), self.loaded)
+        {
+            let Some(sr) = cx.doc.find(to).map(|loc| loc.spread) else { return vec![] };
+            let end = cx.layout.to_spread(sr, ev.pos);
+            let mut p = json!({"frame": src.id.0, "point": [src.at.x, src.at.y], "toFrame": to.0, "toPoint": [start.x, start.y]});
+            if (end - start).length() > 2.0 {
+                p["toEnd"] = json!([end.x, end.y]);
+            }
+            return vec![Action::Exec("type.applyFormatAt".into(), p)];
+        }
         if ev.kind != PointerKind::Down {
             return vec![];
+        }
+        if ev.mods.alt {
+            self.loaded = None;
+        }
+        if let Some(src) = self.loaded {
+            let Some((sr, id)) = cx.hit(ev.pos) else {
+                // Empty canvas: the Eyedropper lets go of what it held.
+                self.loaded = None;
+                return vec![Action::Handled];
+            };
+            if id == src.id {
+                return vec![Action::Handled];
+            }
+            if src.text && cx.doc.item(id).is_some_and(|it| it.is_text_frame()) {
+                self.press = Some((id, cx.layout.to_spread(sr, ev.pos)));
+                return vec![Action::Handled];
+            }
+            return vec![Action::Exec("object.matchAttributes".into(), json!({"from": src.id.0, "ids": [id.0]}))];
         }
         let selected = !cx.selection.items.is_empty() || cx.selection.text.is_some() || cx.selection.cells.is_some();
         let hit = cx.hit(ev.pos);
@@ -339,7 +384,10 @@ impl Tool for EyedropperTool {
         }
         let Some((sr, id)) = hit else { return vec![] };
         if !selected {
-            return vec![Action::Exec("selection.set".into(), json!({"ids": [id.0]}))];
+            // Load it: what it picks up goes on whatever is clicked next.
+            let text = cx.doc.item(id).is_some_and(|it| it.is_text_frame());
+            self.loaded = Some(Loaded { id, at: cx.layout.to_spread(sr, ev.pos), text });
+            return vec![Action::Handled];
         }
         // With text selected, clicking text picks up its formatting (InDesign's Eyedropper).
         if cx.selection.text.is_some() && cx.doc.item(id).is_some_and(|it| it.is_text_frame()) {
@@ -348,7 +396,7 @@ impl Tool for EyedropperTool {
         }
         vec![Action::Exec("object.matchAttributes".into(), json!({"from": id.0}))]
     }
-    fn cursor(&self, _cx: &ToolContext, _p: Point, _m: Mods) -> Cursor {
-        Cursor::Eyedropper
+    fn cursor(&self, _cx: &ToolContext, _p: Point, m: Mods) -> Cursor {
+        if self.loaded.is_some() && !m.alt { Cursor::EyedropperLoaded } else { Cursor::Eyedropper }
     }
 }
