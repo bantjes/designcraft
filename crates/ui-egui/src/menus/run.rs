@@ -1192,7 +1192,7 @@ fn run_ui_part5(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
             // Properties stack.
             let groups = match name {
                 "Essentials Classic" => Some(CLASSIC_GROUPS),
-                // Marian keeps its own panel layout in Typography (type panels under Layers).
+                // Marian keeps its own panel layout in Typography (the icon strip at the window edge).
                 "Typography" if !crate::closet::sorted() => Some(TYPOGRAPHY_GROUPS),
                 _ => None,
             };

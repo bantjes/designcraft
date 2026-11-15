@@ -332,3 +332,13 @@ fn marian_preferences_from_before_the_setup_open_in_typography_once() {
     assert_eq!((ui.workspace.as_str(), ui.control_bar), ("Book", false), "her own later choices stay");
     assert!(UiState::default().control_bar, "a first start opens with the Control panel too");
 }
+
+/// A later set-up puts the panels back in Marian's own layout and keeps the workspace and
+/// Control panel she chose after set-up 1.
+#[test]
+fn marian_preferences_from_an_earlier_setup_get_the_panel_layout_once() {
+    crate::closet::use_starting_sort();
+    let ui = load(json!({"workspace": "Book", "controlBar": false, "marianSetup": 1, "floating": [["swatches", [100.0, 120.0]]]}));
+    assert_eq!((ui.workspace.as_str(), ui.control_bar, ui.marian_setup), ("Book", false, crate::state::MARIAN_SETUP));
+    assert!(ui.floating.is_empty() && ui.docking.is_none(), "the panels go to Marian's own layout");
+}

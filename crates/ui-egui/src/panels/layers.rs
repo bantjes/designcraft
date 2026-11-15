@@ -552,16 +552,20 @@ pub fn show(app: &mut DesignApp, ui: &mut Ui) {
     ui.add_space(6.0);
     ui.spacing_mut().item_spacing.y = 4.0;
     ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new(format!(
-                "{}: {}, {}",
-                crate::i18n::tr(&app.ui.language, "Page"),
-                app.session.page_label(cur),
-                crate::i18n::count_label(&app.ui.language, if doc.layers.len() == 1 { "layer" } else { "layers" }, doc.layers.len())
-            ))
-            .size(11.0)
-            .color(t.text_dim),
-        );
+        // A narrow panel keeps its buttons: the count needs about 150 pt beside them, and would
+        // push them out of the panel.
+        if ui.available_width() >= 150.0 {
+            ui.label(
+                egui::RichText::new(format!(
+                    "{}: {}, {}",
+                    crate::i18n::tr(&app.ui.language, "Page"),
+                    app.session.page_label(cur),
+                    crate::i18n::count_label(&app.ui.language, if doc.layers.len() == 1 { "layer" } else { "layers" }, doc.layers.len())
+                ))
+                .size(11.0)
+                .color(t.text_dim),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::button(ui, "trash", 20.0, false, crate::i18n::tr(&app.ui.language, "Delete Layer")).clicked() {
                 let _ = app.run("layer.delete", json!({"id": active.0}));

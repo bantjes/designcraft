@@ -132,9 +132,13 @@ fn marian_setup(ui: &mut UiState) {
     if !crate::closet::sorted() || ui.marian_setup >= crate::state::MARIAN_SETUP {
         return;
     }
-    ui.control_bar = true;
-    ui.workspace = "Typography".into();
-    ui.icon_groups = None;
+    // Set-up 1 chooses the workspace; her own later choice of one stays through the later
+    // set-ups, which only put the panels back in Marian's own layout.
+    if ui.marian_setup < 1 {
+        ui.control_bar = true;
+        ui.workspace = "Typography".into();
+        ui.icon_groups = None;
+    }
     ui.dock_expanded = true;
     ui.docking = None;
     ui.floating.clear();

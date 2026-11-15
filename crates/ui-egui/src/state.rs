@@ -81,8 +81,12 @@ pub enum ScreenMode {
 
 /// The latest Marian set-up (see [`UiState::marian_setup`]). 1 (2026-11-14): open in Typography
 /// with the Control panel showing, and the panels in Marian's own default layout (Character,
-/// Paragraph and the other type panels under Layers).
-pub const MARIAN_SETUP: u32 = 1;
+/// Paragraph and the other type panels under Layers). 2 (2026-11-15): a build that put every
+/// other panel under Layers too. 3 (2026-11-15): those are back in the iconic column, so a panel
+/// layout saved by set-up 2 goes back to Marian's own once (the workspace she chose stays).
+/// 4 (2026-11-15): the iconic column is at the window's edge, outside the Layers column, and
+/// holds the type panels again (no reset for that: she had moved them there herself).
+pub const MARIAN_SETUP: u32 = 4;
 
 /// A saved workspace: which bars show and where the panels are.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

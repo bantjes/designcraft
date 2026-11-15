@@ -1344,3 +1344,58 @@ fn the_right_panel_column_drags_very_narrow() {
     let moved = right(&h).center().x - before.center().x;
     assert!(moved >= 180.0, "the right column gives up only {moved} pt (from {before:?})");
 }
+
+/// Emma: the Layers panel keeps its footer buttons (Create New Layer, Delete Layer) in view in
+/// Marian's layout, at the column's starting width and when the column is dragged narrow: the
+/// count beside them used to push them out of the panel.
+#[test]
+fn marian_layers_footer_buttons_stay_in_view() {
+    use egui_kittest::kittest::Queryable;
+    crate::closet::use_starting_sort();
+    let mut app = app();
+    app.run("file.new", json!({})).unwrap();
+    let mut h = harness(app, vec2(1280.0, 800.0));
+    h.run_steps(5);
+    let in_column = |h: &Harness<'static, DesignApp>, when: &str| {
+        let layers = craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Column("layers".to_string()));
+        let left = hits(h).into_iter().find_map(|(hit, rect)| (hit == layers).then_some(rect)).expect("the Layers column's divider").left();
+        for label in ["Create New Layer", "Delete Layer"] {
+            let r = h.get_by_label(label).rect();
+            // The icon strip (37 pt) is outside the column, at the window's edge.
+            assert!(r.left() >= left && r.right() <= 1280.0 - 37.0, "{label} at {r:?} is outside the Layers column (from {left}) {when}");
+        }
+    };
+    in_column(&h, "at the starting width");
+    let layers = craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Column("layers".to_string()));
+    let divider = hits(&h).into_iter().find_map(|(hit, rect)| (hit == layers).then_some(rect)).expect("the Layers column's divider");
+    drag(&mut h, divider.center(), egui::pos2(1150.0, divider.center().y));
+    h.run_steps(5);
+    in_column(&h, "in a narrow column");
+}
+
+/// Emma: a panel opened from the icon strip does not pop out over the page. The strip is at the
+/// window's edge, outside the Layers column, and its flyout covers that column.
+#[test]
+fn marian_strip_panels_open_over_the_layers_column_not_the_page() {
+    crate::closet::use_starting_sort();
+    let mut app = app();
+    app.run("file.new", json!({})).unwrap();
+    let layout = default_layout(&app.ui);
+    assert!(valid(&layout), "Marian's default layout is valid");
+    // The end dock's columns, from the window's edge inwards (the Pages column is the start dock's).
+    let holds = |c: &Column<String>, panel: &str| c.groups.iter().any(|g| g.panels.iter().any(|p| p == panel));
+    let columns: Vec<&Column<String>> = dock_columns(&layout).into_iter().filter(|c| !holds(c, "pages")).collect();
+    assert!(columns.first().is_some_and(|c| c.iconic), "the iconic column is the outer one: {columns:?}");
+    assert!(columns.get(1).is_some_and(|c| holds(c, "layers")), "then the Layers column: {columns:?}");
+    // The type panels are in the strip too, not under Layers.
+    assert!(columns.first().is_some_and(|c| holds(c, "character") && holds(c, "paragraphStyles")), "{columns:?}");
+    assert!(columns.get(1).is_some_and(|c| c.groups.len() == 1), "Layers has its column to itself: {columns:?}");
+    let mut h = harness(app, vec2(1280.0, 800.0));
+    h.run_steps(5);
+    h.state_mut().run("window.panel", json!({"panel": "swatches"})).unwrap();
+    h.run_steps(5);
+    assert_eq!(h.state().ui.docking_flyout.as_deref(), Some("swatches"), "Swatches opens as the strip's flyout");
+    let tab = h.ctx.read_response(tab_id("swatches")).expect("the flyout's Swatches tab").rect;
+    let canvas = h.state().canvas_rect.expect("the canvas");
+    assert!(tab.left() >= canvas.right() - 1.0, "the flyout (tab {tab:?}) is over the canvas {canvas:?}");
+}

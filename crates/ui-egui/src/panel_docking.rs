@@ -120,7 +120,7 @@ impl Placed {
 const ICON_GROUPS: &[&[&str]] = &[
     &["stroke", "color", "swatches", "gradient"],
     &["effects"],
-    // Marian DesignCraft: the text panels in Emma's order (in the Layers column when sorted).
+    // Marian DesignCraft: the text panels in Emma's order.
     &["character", "paragraph", "story", "glyphs", "typography"],
     &["paragraphStyles", "characterStyles"],
     &["objectStyles"],
@@ -138,9 +138,6 @@ const ICON_GROUPS: &[&[&str]] = &[
     &["articles", "tags"],
     &["book", "dataMerge", "scripts"],
 ];
-
-/// Marian DesignCraft: the type panels' groups, docked under Layers.
-const TEXT_GROUPS: &[&[&str]] = &[&["character", "paragraph", "story", "glyphs", "typography"], &["paragraphStyles", "characterStyles"]];
 
 /// A workspace's iconic column of the panels not placed yet: its named `icon_groups`
 /// (Essentials Classic, Typography), or [`ICON_GROUPS`] followed by any other dock panel as a
@@ -206,15 +203,6 @@ pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
         if !panels.is_empty() {
             groups.push(Group::new(panels, active));
         }
-        // Marian DesignCraft: the type panels sit in this column under Layers, as tabs that open
-        // in place, instead of flying out of the iconic column over the pasteboard.
-        if crate::closet::sorted() {
-            for family in TEXT_GROUPS {
-                if let Some(group) = placed.group(family, 0) {
-                    groups.push(Group { minimized: true, ..group });
-                }
-            }
-        }
         // The panel a workspace opens (Printing and Proofing: Swatches) goes below at a fixed
         // height, so Properties keeps most of the column.
         if let Some(id) = ui.open_panel.as_deref().and_then(|id| placed.take(id)) {
@@ -224,7 +212,15 @@ pub(crate) fn default_layout(ui: &crate::UiState) -> Layout<String> {
             columns.push(Column { groups, width: COLUMN_WIDTH, iconic: !ui.dock_expanded, iconic_width: Some(ICON_WIDTH) });
         }
     }
-    columns.extend(icon_column(ui.icon_groups.as_deref(), &mut placed));
+    let icons = icon_column(ui.icon_groups.as_deref(), &mut placed);
+    // Marian DesignCraft: the iconic column is at the window's edge, outside the Layers column,
+    // so its flyouts (which open on the canvas side) cover the Layers column, not the page. The
+    // type panels (Character, Paragraph…) are in it too, as Emma arranged them.
+    if crate::closet::sorted() && ui.icon_groups.is_none() {
+        columns.splice(0..0, icons);
+    } else {
+        columns.extend(icons);
+    }
     let layout = with_canvas(columns, floating);
     match start {
         Some(column) => with_start_column(layout, column),
