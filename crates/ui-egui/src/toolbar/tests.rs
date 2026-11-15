@@ -623,3 +623,16 @@ fn alt_click_cycles_the_tool_flyout_group() {
     assert!(h.state().app.ui.dialog.is_none(), "plain click after Alt-click must not open Polygon Settings");
     assert_eq!(h.state().app.session.tool_id(), "polygonFrame");
 }
+
+/// Emma: "choosing a colour colours the stroke instead of the fill". A double-click on the Fill
+/// box where the Stroke box sits under it opened the stroke's Color Picker.
+#[test]
+fn the_proxy_box_in_front_owns_the_overlap() {
+    let fill = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(19.5, 19.5));
+    let stroke = egui::Rect::from_min_size(egui::pos2(10.0, 10.0), egui::vec2(19.5, 19.5));
+    let overlap = egui::pos2(15.0, 15.0);
+    assert!(super::proxy_hit_is_fill(fill, stroke, false, overlap, false), "fill in front");
+    assert!(!super::proxy_hit_is_fill(fill, stroke, true, overlap, true), "stroke in front");
+    assert!(super::proxy_hit_is_fill(fill, stroke, true, egui::pos2(3.0, 3.0), false));
+    assert!(!super::proxy_hit_is_fill(fill, stroke, false, egui::pos2(25.0, 25.0), false));
+}

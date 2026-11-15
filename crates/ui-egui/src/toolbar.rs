@@ -358,6 +358,17 @@ fn proxy_default_swap(app: &mut DesignApp, ui: &mut egui::Ui, t: &Tokens, x0: f3
     }
 }
 
+/// Whether a click at `at` on the Fill/Stroke proxy is on the Fill box: the box in front owns the
+/// overlap. `fill_only` (only the Fill box's own response saw it) settles a missing position.
+fn proxy_hit_is_fill(fill_r: egui::Rect, stroke_r: egui::Rect, stroke_front: bool, at: egui::Pos2, fill_only: bool) -> bool {
+    match (fill_r.contains(at), stroke_r.contains(at)) {
+        (true, true) => !stroke_front,
+        (true, false) => true,
+        (false, true) => false,
+        (false, false) => fill_only,
+    }
+}
+
 /// The area under the tools (InDesign 2026 §3 group 5): mini Default Fill/Stroke and Swap, the
 /// overlapping Fill/Stroke proxy, Formatting affects container / text, the Apply None well, a
 /// utility button and the Screen Mode well.
@@ -430,7 +441,11 @@ fn fill_stroke_proxy(app: &mut DesignApp, ui: &mut egui::Ui, width: f32, cols: u
     // A double-click opens the Color Picker for that box (as InDesign's), with the colour of what
     // colour edits apply to (see `colors_affect_text`).
     if fresp.double_clicked() || sresp.double_clicked() {
-        let on_fill = fresp.double_clicked() && (!stroke_front || !sresp.double_clicked());
+        // Where the squares overlap, the one in front was clicked (the Stroke box takes the
+        // pointer there, so asking which response saw it opened the stroke's picker for a
+        // double-click on the Fill box in front).
+        let at = sresp.interact_pointer_pos().or(fresp.interact_pointer_pos()).unwrap_or_default();
+        let on_fill = proxy_hit_is_fill(fill_r, stroke_r, stroke_front, at, fresp.double_clicked());
         let stroke = !on_fill;
         let current = if stroke { &stroke_sw } else { &fill_sw };
         let mut fields = crate::panels::swatches::picker_fields(doc.as_ref().and_then(|d| d.resolve_color(current, 1.0)), stroke);
