@@ -2,6 +2,16 @@
 //! folders' modified times are checked, and when one changed, because a font was installed or
 //! removed, the fonts are read again. No timer of its own: coming back to the app from Font Book
 //! draws a frame, and that frame looks.
+//!
+//! On macOS a font manager or Font Book also switches fonts on and off without moving their files
+//! (CoreText registers them from wherever they are), which the folders don't show. A background
+//! thread looks at CoreText's font families twice a second and at its full list of font files
+//! every five seconds ([`platform`]), and wakes the app when either changed and has settled: a
+//! family switched on or off is in the font menus within about a second, a single style within a
+//! few seconds, even
+//! while DesignCraft is in the background. It asks rather than listens for CoreText's
+//! notification because subscribing to that needs `unsafe` Objective-C calls, which the workspace
+//! forbids.
 
 use serde_json::json;
 
@@ -14,6 +24,21 @@ const EVERY: f64 = 3.0;
 struct Watch {
     next: f64,
     signature: Option<u64>,
+}
+
+/// Reloads at once when the platform's list of switched-on fonts changed (macOS; nothing to do
+/// elsewhere). Runs on every logic tick, also while the window is hidden and before the UI's own
+/// fonts have their installed faces: the watch wakes the app, and nothing else may.
+pub(crate) fn platform_tick(app: &mut DesignApp, ctx: &egui::Context) {
+    #[cfg(target_os = "macos")]
+    {
+        platform::start(ctx);
+        if platform::take() {
+            reload(app);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, ctx);
 }
 
 /// Looks at the font folders when it is time to.
@@ -36,15 +61,90 @@ fn step(app: &mut DesignApp, last: &mut Option<u64>, signature: u64) -> bool {
     let changed = last.is_some_and(|l| l != signature);
     *last = Some(signature);
     if changed {
-        match app.run("font.reload", json!({})) {
-            Ok(_) => {
-                let msg = crate::i18n::tr(&app.ui.language, "Fonts updated").to_owned();
-                app.status(msg);
-            }
-            Err(e) => app.status(e),
-        }
+        reload(app);
     }
     changed
+}
+
+/// Read the fonts again and recompose the open documents (`font.reload`), saying so in the status
+/// bar. Text set in a font that is gone keeps its font and shows as missing.
+fn reload(app: &mut DesignApp) {
+    match app.run("font.reload", json!({})) {
+        Ok(_) => {
+            let msg = crate::i18n::tr(&app.ui.language, "Fonts updated").to_owned();
+            app.status(msg);
+        }
+        Err(e) => app.status(e),
+    }
+}
+
+/// macOS: the watch on CoreText's list of available fonts.
+#[cfg(target_os = "macos")]
+mod platform {
+    use std::sync::Once;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
+
+    /// How often the cheap look runs: CoreText's family names, a few milliseconds.
+    const LOOK_EVERY: Duration = Duration::from_millis(500);
+    /// Every this many cheap looks, the full list of font files (tens of milliseconds): it also
+    /// sees a style switched on or off in a family that stays available.
+    const FULL_EVERY: u32 = 10;
+    /// How long the list must stay the same before the fonts are reloaded: a font manager
+    /// switching a family on changes it in steps, and the batch is reloaded once.
+    const SETTLE: Duration = Duration::from_millis(500);
+
+    /// The list changed and settled since [`take`] last answered.
+    static CHANGED: AtomicBool = AtomicBool::new(false);
+
+    /// Start the watch (once); it wakes `ctx` when the list changed.
+    pub(super) fn start(ctx: &egui::Context) {
+        static START: Once = Once::new();
+        START.call_once(|| {
+            let wake = ctx.clone();
+            // Without a thread to spare, coming back to the app still finds fonts in the font
+            // folders, as before.
+            let _ = std::thread::Builder::new().name("font-list-watch".into()).spawn(move || watch(&wake));
+        });
+    }
+
+    /// Both looks: the families' and the files'.
+    fn both() -> (u64, u64) {
+        (designcraft_fonts::platform_families_signature(), designcraft_fonts::platform_fonts_signature())
+    }
+
+    fn watch(wake: &egui::Context) {
+        let (mut families, mut files) = both();
+        let mut looks = 0u32;
+        loop {
+            std::thread::sleep(LOOK_EVERY);
+            looks = looks.wrapping_add(1);
+            let changed = designcraft_fonts::platform_families_signature() != families
+                || (looks % FULL_EVERY == 0 && designcraft_fonts::platform_fonts_signature() != files);
+            if !changed {
+                continue;
+            }
+            // Wait for the batch to finish: two full looks SETTLE apart that agree.
+            let mut now = both();
+            loop {
+                std::thread::sleep(SETTLE);
+                let again = both();
+                if again == now {
+                    break;
+                }
+                now = again;
+            }
+            (families, files) = now;
+            log::debug!("the available fonts changed: reloading them");
+            CHANGED.store(true, Ordering::Release);
+            wake.request_repaint();
+        }
+    }
+
+    /// Whether the list changed (and settled) since the last call.
+    pub(super) fn take() -> bool {
+        CHANGED.swap(false, Ordering::AcqRel)
+    }
 }
 
 #[cfg(test)]

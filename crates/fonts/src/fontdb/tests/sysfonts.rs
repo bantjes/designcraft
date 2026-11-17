@@ -439,3 +439,36 @@ fn reloading_lets_go_of_removed_fonts_and_finds_new_ones() {
     assert!(db.has_family("DC Test Added Later"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// What [`switched_files`] lists: the files a font manager has switched on.
+static SWITCHED_ON: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+fn switched_files() -> Vec<PathBuf> {
+    SWITCHED_ON.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
+}
+
+/// A font manager switches a font off by unregistering it, leaving its file where it was: a reload
+/// lets go of it as of a removed font (text set in it shows the font as missing), and switching it
+/// on again brings it back.
+#[test]
+fn reloading_lets_go_of_fonts_switched_off_whose_files_stay() {
+    let library = std::env::temp_dir().join(format!("dc-switched-fonts-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&library);
+    std::fs::create_dir_all(&library).unwrap();
+    let file = library.join("Switched.ttf");
+    write_font(&file, &crate::testing::font_with("DC Test Switched", &['a']).unwrap(), 10);
+    *SWITCHED_ON.lock().unwrap() = vec![file.clone()];
+    let folder = font_dir("switched");
+    let db = FontDb { font_files: switched_files, ..FontDb::with_font_dirs(vec![folder.clone()]) };
+    assert_eq!(db.face("DC Test Switched", "Regular").family, "DC Test Switched", "switched on: listed and loaded");
+    SWITCHED_ON.lock().unwrap().clear();
+    assert_eq!(db.reload_fonts().changed, std::slice::from_ref(&file), "switched off, the file still there");
+    assert!(file.exists());
+    assert!(!db.has_family("DC Test Switched"));
+    assert_eq!(db.face("DC Test Switched", "Regular").family, FALLBACK_FAMILY);
+    *SWITCHED_ON.lock().unwrap() = vec![file.clone()];
+    db.reload_fonts();
+    assert_eq!(db.face("DC Test Switched", "Regular").family, "DC Test Switched", "switched on again");
+    let _ = std::fs::remove_dir_all(&library);
+    let _ = std::fs::remove_dir_all(&folder);
+}

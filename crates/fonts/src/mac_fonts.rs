@@ -26,3 +26,12 @@ pub(crate) fn available_font_files() -> Vec<PathBuf> {
     })
     .unwrap_or_default()
 }
+
+/// The family names of the fonts available to the process as CoreText lists them now: one
+/// CoreText call, much cheaper than [`available_font_files`], to tell when a font manager switched
+/// a family on or off.
+pub(crate) fn available_family_names() -> Vec<String> {
+    // As above: should `core-text` assert, the answer is an empty list.
+    std::panic::catch_unwind(|| core_text::font_manager::copy_available_font_family_names().iter().take(MAX_FONTS).map(|n| n.to_string()).collect())
+        .unwrap_or_default()
+}

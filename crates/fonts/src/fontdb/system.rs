@@ -298,6 +298,42 @@ pub(super) fn platform_font_files() -> Vec<std::path::PathBuf> {
     Vec::new()
 }
 
+/// A fingerprint of the font files the platform has available outside the font folders (on
+/// macOS, those CoreText's font manager lists). It changes when a font manager or Font Book
+/// switches a font on or off without moving its file, which [`font_dirs_signature`] can't see.
+/// Costs a full list of the platform's fonts (tens of milliseconds on macOS), so look from a
+/// background thread, and not often: [`platform_families_signature`] is the cheap look. Always the
+/// same where the platform lists none.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn platform_fonts_signature() -> u64 {
+    #[cfg(target_os = "macos")]
+    use super::platform_font_files;
+    use std::hash::{Hash, Hasher};
+    let mut files = platform_font_files();
+    files.sort();
+    files.dedup();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    files.hash(&mut h);
+    h.finish()
+}
+
+/// A fingerprint of the font families the platform has available (on macOS, CoreText's list of
+/// family names): it changes when a font manager or Font Book switches a whole family on or off.
+/// Much cheaper than [`platform_fonts_signature`], which also sees a style switched on or off in
+/// a family that stays available. Always the same where the platform lists none.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn platform_families_signature() -> u64 {
+    use std::hash::{Hash, Hasher};
+    #[cfg(target_os = "macos")]
+    let mut families = crate::mac_fonts::available_family_names();
+    #[cfg(not(target_os = "macos"))]
+    let mut families: Vec<String> = Vec::new();
+    families.sort();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    families.hash(&mut h);
+    h.finish()
+}
+
 /// The files in `listed` that aren't in `scanned` (canonical paths), each once and added to
 /// `scanned`; paths that don't lead to a file (gone, unreadable folder) are left out.
 #[cfg(not(target_arch = "wasm32"))]
@@ -363,7 +399,8 @@ impl FontDb {
 
     /// Fonts installed, changed or removed since they were read (#328): scan the font folders
     /// again (see [`FontDb::load_system_fonts`]), then let go of the shared faces whose installed
-    /// file changed (length or modification time) or is gone, so the next lookup reads the file as
+    /// file changed (length or modification time), is gone, or is no longer installed (a font
+    /// manager switched it off and left the file where it was), so the next lookup reads the file as
     /// it is now, or finds the font missing. What was composed with the old faces must be composed
     /// again. Faces are never freed (see [`FaceRef`]): each reload of a changed file keeps the old
     /// copy. Bundled, added and document fonts are left alone. Nothing to do on wasm.
@@ -372,9 +409,16 @@ impl FontDb {
         {
             // Rescan first: a lookup after the faces are dropped finds the new files.
             let cataloged = self.load_system_fonts();
+            // Files the scan no longer finds count as removed even when they are still on disk: a
+            // font manager switched the font off (unregistered it) without moving its file.
+            let installed: std::collections::HashSet<std::path::PathBuf> = self.read_catalog().iter().map(|c| c.path.clone()).collect();
             let changed: Vec<std::path::PathBuf> = {
                 let mut files = self.installed_files.lock().unwrap_or_else(PoisonError::into_inner);
-                let mut changed: Vec<_> = files.iter().filter(|(p, stamp)| file_stamp(p).as_ref() != Some(*stamp)).map(|(p, _)| p.clone()).collect();
+                let mut changed: Vec<_> = files
+                    .iter()
+                    .filter(|(p, stamp)| file_stamp(p).as_ref() != Some(*stamp) || !installed.contains(*p))
+                    .map(|(p, _)| p.clone())
+                    .collect();
                 changed.sort();
                 for p in &changed {
                     files.remove(p);
